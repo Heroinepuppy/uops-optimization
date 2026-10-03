@@ -1,0 +1,84 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "CMake Configure",
+      "type": "process",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build",
+        "-G",
+        "Visual Studio 18 2026",
+        "-A",
+        "x64"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Release",
+      "type": "process",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--config",
+        "Release"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "CMake Configure",
+      "dependsOrder": "sequence",
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "Run uop benchmark",
+      "type": "process",
+      "command": ".\\build\\Release\\lidar_uop_benchmark.exe",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Build Release",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run threading benchmark",
+      "type": "process",
+      "command": ".\\build\\Release\\lidar_thread_scaling.exe",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Run uop benchmark",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build and run all benchmarks",
+      "type": "process",
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "echo Benchmarks complete."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Run threading benchmark",
+      "dependsOrder": "sequence",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
