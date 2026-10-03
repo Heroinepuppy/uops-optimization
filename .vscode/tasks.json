@@ -1,13 +1,29 @@
-
-    
-  
 {
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "CMake Configure",
+      "label": "Plot CPU vs GPU results",
       "type": "shell",
-      "command": "cmake -S . -B build -G \"Visual Studio 18 2026\" -A x64",
+      "command": "python .\\plot_cpu_gpu.py",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake Configure",
+      "type": "process",
+      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build/vs2026",
+        "-G",
+        "Visual Studio 18 2026",
+        "-A",
+        "x64"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -15,8 +31,14 @@
     },
     {
       "label": "Build Release",
-      "type": "shell",
-      "command": "cmake --build build --config Release",
+      "type": "process",
+      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
+      "args": [
+        "--build",
+        "build/vs2026",
+        "--config",
+        "Release"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -27,7 +49,7 @@
     {
       "label": "Run uop benchmark",
       "type": "shell",
-      "command": ".\\build\\Release\\lidar_uop_benchmark.exe",
+      "command": ".\\build\\vs2026\\Release\\lidar_uop_benchmark.exe",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -38,7 +60,7 @@
     {
       "label": "Run threading benchmark",
       "type": "shell",
-      "command": ".\\build\\Release\\lidar_thread_scaling.exe",
+      "command": ".\\build\\vs2026\\Release\\lidar_thread_scaling.exe",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -93,6 +115,38 @@
       },
       "dependsOn": "GPU: Build",
       "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Compute: Build GPU",
+      "type": "shell",
+      "command": ".\\build_compute_gpu.cmd",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Compute: Run CPU vs GPU sweep",
+      "type": "shell",
+      "command": "python .\\run_compute_benchmark.py",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": [
+        "Build Release",
+        "Compute: Build GPU"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Compute: Plot saved results",
+      "type": "shell",
+      "command": "python .\\run_compute_benchmark.py --plot-only",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "problemMatcher": []
     }
   ]

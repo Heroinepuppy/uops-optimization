@@ -665,6 +665,8 @@ Gemessen werden für steigende Punktzahlen:
 1.6M
 3.2M
 6.4M
+12.8M
+25.6M
 ```
 
 drei Pfade:
@@ -676,9 +678,8 @@ drei Pfade:
 Die Resultate werden nach
 
 ```text
-gpu_benchmark.csv
-result\gpu_latency.png
-result\gpu_throughput.png
+result\gpu_results.txt
+result\gpu_benchmark.png
 ```
 
 geschrieben.
@@ -703,3 +704,191 @@ Machbarkeit von Sensor, NIC/Capture-Hardware, Treiber, Betriebssystem,
 PCIe-Topologie und GPU abhängt. Für eine spätere reale Systemauslegung sollte
 dieser Punkt aber zwingend geprüft werden, sobald GPU-Offloading einen
 messbaren Vorteil zeigt.
+
+
+## CPU/GPU break-even sweep
+
+CPU thread-scaling and GPU benchmarks now use the same point-count sequence:
+
+```text
+200k
+400k
+800k
+1.6M
+3.2M
+6.4M
+12.8M
+25.6M
+```
+
+Both benchmarks calculate the **highest histogram peak** (the center of the
+60-bin histogram bucket containing the most samples) and write it to:
+
+```text
+result\cpu_results.txt
+result\gpu_results.txt
+```
+
+CPU and GPU write separate files. Each benchmark replaces its previous results
+on the next run. The original `result\results.txt` is retained as a legacy copy;
+new benchmarks and the comparison do not use it.
+
+After running both benchmarks, compare their saved peaks without re-running
+the measurements:
+
+```powershell
+python .\plot_cpu_gpu.py
+```
+
+Alternatively use the VS Code task `Plot CPU vs GPU results`.
+Requires Python 3 and Gnuplot in PATH; no Python packages are required.
+The script writes:
+
+```text
+result\cpu_gpu_comparison.png
+```
+
+The single grouped bar plot compares all measured CPU configurations and all
+three GPU paths over every saved point count. The runtime axis is logarithmic
+and uses microseconds per cloud. Missing measurements remain empty, rather than
+being represented as zero. Above 800k only the 4-core / 4-CCX CPU configuration
+is measured. Repeated size/method rows are read using the latest entry.
+Comparison data and Gnuplot commands stay in memory and are passed directly
+to Gnuplot through standard input; no intermediate CSV or script is written.
+Use `--no-plot` to only read and validate the measurements, or
+`--result-dir PATH` to read results from another directory.
+
+For an offload decision, the relevant GPU paths are:
+
+```text
+PCIe upload + GPU kernel
+PCIe upload + GPU kernel + PCIe download
+```
+
+The existing benchmark distribution plots remain available separately.
+
+The comparison deliberately uses the histogram mode/peak rather than the
+median because the visual distributions are the primary benchmark output.
+
+
+### Break-even summary format
+
+Any break-even summary should state only the tested interval where the crossover
+occurs, for example (these are illustrative values, not measured results):
+
+```text
+< 800000 Punkte: CPU schneller
+> 1600000 Punkte: GPU schneller
+Break-even liegt zwischen 800000 und 1600000 Punkten
+```
+
+This is reported separately for:
+
+```text
+PCIe upload + GPU kernel
+PCIe upload + GPU kernel + PCIe download
+```
+
+
+## CPU sweep optimization
+
+For point clouds above 800k points, the CPU benchmark now runs only the
+previously established fastest CPU configuration:
+
+```text
+4 Threads / 4 Cores / 4 CCX
+```
+
+The full CPU comparison remains enabled at:
+
+```text
+200k
+400k
+800k
+```
+
+For:
+
+```text
+1.6M
+3.2M
+6.4M
+12.8M
+25.6M
+```
+
+only the 4-core / 4-CCX result is measured. This avoids spending benchmark time
+re-proving CPU variants whose relative behavior was already established, while
+still providing the CPU reference needed for GPU break-even analysis.
+
+
+## Dritter Test: Transformationsketten auf CPU und GPU
+
+`run_compute_benchmark.py` variiert zwei Groessen: 200.000 bis 25.600.000
+Punkte (Verdopplung) und 1, 2, 4, ... 1024 Transformationen pro Punkt.
+Bei jeder Kette geht das Ergebnis einer Transformation in die naechste ein.
+Die Matrix wird nicht vorab potenziert. Eingaben werden einmal geladen,
+Zwischenwerte im Kernel weiterverarbeitet und nur das Endergebnis gespeichert.
+Jeder neue Messdurchlauf beginnt wieder mit derselben unveraenderten Eingabe.
+Das erhoeht die Rechenintensitaet ohne zusaetzliche Cloud-Transfers pro Transformation.
+Es ist kein Test von K separaten Speicher-Passes oder K GPU-Kernelstarts.
+
+CPU: bisher schnellster Pfad, AVX2 x2 mit vier permanenten Threads auf vier
+verschiedenen L3/CCX-Gruppen. Bei K=1 wird der bestehende Kernel verwendet.
+Bei K>1 wird seine Operationsfolge pro 16 Punkte wiederholt. Pro Cloud gibt es
+ein Start-/Ende-Barrierenpaar. Fehlt die passende Topologie, bricht der Test ab.
+Der alte Groessen-Benchmark verwendet denselben unveraenderten CPU-Kern aus
+`lidar_cpu_core.h`.
+
+GPU: ein HIP-Kernelstart pro Kette, 256 Threads pro Block. Die Messungen sind:
+
+- GPU-Kernel allein (HIP-Events).
+- GPU mit residenten Daten inklusive Host-Aufruf und Synchronisation.
+- Upload + GPU inklusive Synchronisation (Host-Uhr).
+- Upload + GPU + Download inklusive Synchronisation (Host-Uhr).
+
+Wie im bisherigen GPU-Test sind die Host-Puffer normale `std::vector`-Puffer;
+Transfers erfolgen synchron. Es gibt kein Transfer-/Compute-Overlapping.
+CPU-Zeiten sind pro Cloud normalisierte Blockzeiten (Blockziel mindestens 5 ms),
+GPU-Zeiten einzelne Aufrufe. Alle Kurven verwenden den Median, nicht den
+Histogramm-Peak. Rohmessungen und Peaks mit 60 Bins werden ebenfalls gespeichert.
+Ungueltige GPU-Eventzeiten werden gezaehlt und bis zu zehnmal wiederholt;
+die Spalte `invalid_samples` dokumentiert diese Wiederholungen.
+Referenzpruefungen und Warm-up liegen ausserhalb der Messung. Die Ergebnisse
+werden gegen eine Double-Referenz geprueft, einschliesslich Partitionsgrenzen.
+
+Bauen und ausfuehren (Developer-Terminal):
+
+```powershell
+cmake --build build/vs2026 --config Release --target lidar_compute_cpu
+.\build_compute_gpu.cmd
+python .\run_compute_benchmark.py
+```
+
+Alternativ VS-Code-Task **Compute: Run CPU vs GPU sweep** verwenden. Der GPU-Build
+verwendet wie der vorhandene Test ROCm 7.2, MSVC 14.44 und `gfx1100`.
+Standard: 20 Messrunden je Kombination; der komplette Sweep kann mehrere Minuten dauern.
+
+```powershell
+# Schneller Durchlauf ueber alle acht Punktzahlen:
+python .\run_compute_benchmark.py --rounds 5 --max-transforms 128
+# Einzelne Punktzahl, hoehere Transformationszahlen:
+python .\run_compute_benchmark.py --points 200000 --max-transforms 4096 --output-dir result/compute_extra
+# Nur gespeicherte Ergebnisse neu plotten:
+python .\run_compute_benchmark.py --plot-only
+```
+
+Ausgabe: `result/compute/<Punktzahl>/compute_{cpu,gpu}_{results,samples}.csv`,
+`result/compute/compute_comparison.{gp,png}`, `compute_speedup.png` und
+`compute_crossover.csv`. Der Speedup-Plot zeigt CPU-Zeit geteilt durch
+GPU-Roundtrip-Zeit; Werte ueber 1 bedeuten einen GPU-Vorteil.
+Die Vergleichsgrafik zeigt einen Subplot pro Punktzahl, lineare Y-Achsen mit
+hoechstens zehn Ticks und keine Gitternetzlinien. Die X-Achse ist log2, damit
+die Verdopplungsschritte gleich weit auseinander liegen.
+
+Der erste GPU-Vorteil wird ausschliesslich aus **vollstaendigem GPU-Roundtrip
+gegen CPU** ermittelt. Die CSV nennt auch den vorherigen getesteten Wert und
+ab welchem Messwert die GPU bei allen nachfolgenden getesteten Werten vorne
+liegt. Das sind diskrete Messpunkte, keine interpolierte exakte Schwelle und
+keine Aussage ueber statistische Signifikanz. Kleine Differenzen sollten mit
+mehr Messrunden und dichterer Abstufung nachgemessen werden.

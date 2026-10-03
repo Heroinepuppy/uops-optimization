@@ -1,0 +1,33 @@
+{
+  "completed_utc": "2026-10-03T20:45:36.346571+00:00",
+  "points": [
+    200000,
+    400000,
+    800000,
+    1600000,
+    3200000,
+    6400000,
+    12800000,
+    25600000
+  ],
+  "rounds": 20,
+  "transformations": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "cpu": "AVX2 x2, 4 Threads / 4 Cores / 4 CCX, logical CPUs 4 8 16 24",
+  "gpu": "AMD Radeon RX 7900 XT, HIP gfx1100, 256 threads/block",
+  "mode": "chained transforms, one input load and final output store per cloud",
+  "statistic": "median",
+  "crossover": "CPU vs GPU including upload and download",
+  "valid_samples": 8800
+}

@@ -1,0 +1,25 @@
+### BEGIN CPU
+Histogram bins: 60
+Peak = center of histogram bin with highest sample count
+points;method;peak_us;peak_count;samples
+200000;1 Thread;44.195;404;1000
+200000;2 Threads / 1 Core SMT;52.458;63;1000
+200000;2 Threads / 2 Cores same CCX;33.472;185;1000
+200000;2 Threads / 2 Cores different CCX;35.058;216;1000
+200000;4 Threads / 4 Cores / 4 CCX;28.714;214;1000
+400000;1 Thread;103.011;260;1000
+400000;2 Threads / 1 Core SMT;117.414;126;1000
+400000;2 Threads / 2 Cores same CCX;63.521;272;1000
+400000;2 Threads / 2 Cores different CCX;64.373;230;1000
+400000;4 Threads / 4 Cores / 4 CCX;42.974;185;1000
+800000;1 Thread;722.897;158;1000
+800000;2 Threads / 1 Core SMT;708.479;135;1000
+800000;2 Threads / 2 Cores same CCX;605.608;114;1000
+800000;2 Threads / 2 Cores different CCX;107.849;196;1000
+800000;4 Threads / 4 Cores / 4 CCX;65.972;191;1000
+1600000;4 Threads / 4 Cores / 4 CCX;123.284;225;1000
+3200000;4 Threads / 4 Cores / 4 CCX;2521.858;92;1000
+6400000;4 Threads / 4 Cores / 4 CCX;6633.947;117;1000
+12800000;4 Threads / 4 Cores / 4 CCX;13361.836;109;1000
+25600000;4 Threads / 4 Cores / 4 CCX;26536.923;168;1000
+### END CPU

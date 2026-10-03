@@ -1,0 +1,22 @@
+
+### GPU RESULTS ###
+Peak = Mittelpunkt des Histogramm-Bins mit den meisten Messungen
+points;method;peak_us;peak_count;samples;invalid_samples
+200000;GPU kernel only;20.360;117;195;5
+200000;PCIe upload + GPU kernel;396.800;22;200;0
+200000;PCIe upload + GPU kernel + PCIe download;870.880;16;200;0
+400000;GPU kernel only;25.205;59;196;4
+400000;PCIe upload + GPU kernel;581.388;13;200;0
+400000;PCIe upload + GPU kernel + PCIe download;1594.388;12;200;0
+800000;GPU kernel only;34.130;55;194;6
+800000;PCIe upload + GPU kernel;970.119;11;200;0
+800000;PCIe upload + GPU kernel + PCIe download;2426.550;12;200;0
+1600000;GPU kernel only;38.565;84;198;2
+1600000;PCIe upload + GPU kernel;1398.762;11;200;0
+1600000;PCIe upload + GPU kernel + PCIe download;3534.112;10;200;0
+3200000;GPU kernel only;56.865;28;200;0
+3200000;PCIe upload + GPU kernel;3154.682;11;200;0
+3200000;PCIe upload + GPU kernel + PCIe download;6622.788;9;200;0
+6400000;GPU kernel only;197.316;35;200;0
+6400000;PCIe upload + GPU kernel;5598.729;16;200;0
+6400000;PCIe upload + GPU kernel + PCIe download;12440.657;13;200;0
