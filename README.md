@@ -633,3 +633,73 @@ werden, ohne lokale absolute Pfade anpassen zu müssen.
 
 Voraussetzung ist lediglich, dass `cmake` und `gnuplot` im `PATH` verfügbar
 sind.
+
+
+## GPU-Benchmark (AMD HIP)
+
+Zusätzlich zu den CPU-Benchmarks enthält das Projekt nun:
+
+```text
+lidar_gpu_benchmark.cpp
+```
+
+Der GPU-Test ist bewusst **nicht** Teil des normalen CPU-Benchmark-Laufs.
+In VS Code kann er separat über
+
+```text
+Tasks: Run Task -> Run GPU benchmark
+```
+
+gestartet werden. Dabei wird zuerst ausschließlich der HIP-Benchmark gebaut und
+anschließend ausgeführt.
+
+Der Build verwendet die vom AMD HIP SDK angelegte Umgebungsvariable
+`HIP_PATH_72` und kompiliert für die Radeon RX 7900 XT (`gfx1100`).
+
+Gemessen werden für steigende Punktzahlen:
+
+```text
+200k
+400k
+800k
+1.6M
+3.2M
+6.4M
+```
+
+drei Pfade:
+
+1. nur GPU-Kernel
+2. Host -> GPU + Kernel
+3. Host -> GPU + Kernel + GPU -> Host
+
+Die Resultate werden nach
+
+```text
+gpu_benchmark.csv
+result\gpu_latency.png
+result\gpu_throughput.png
+```
+
+geschrieben.
+
+### Falls die GPU schneller wird: Datenpfad mitoptimieren
+
+Wenn sich bei realen Messdaten zeigt, dass die GPU-Verarbeitung schneller als
+die CPU-Verarbeitung ist, darf die Optimierung nicht beim Kernel enden.
+
+Bei hohen kontinuierlichen Sensordatenraten sollte geprüft werden, ob die
+Eingabehardware einen direkten DMA-/P2P-/RDMA-Datenpfad in GPU-Speicher
+unterstützt. Ein unnötiger Weg
+
+```text
+Sensor -> CPU-RAM -> GPU-VRAM
+```
+
+kann sonst einen erheblichen Teil des GPU-Vorteils wieder aufzehren.
+
+Das ist kein Bestandteil dieses synthetischen Benchmarks, weil die konkrete
+Machbarkeit von Sensor, NIC/Capture-Hardware, Treiber, Betriebssystem,
+PCIe-Topologie und GPU abhängt. Für eine spätere reale Systemauslegung sollte
+dieser Punkt aber zwingend geprüft werden, sobald GPU-Offloading einen
+messbaren Vorteil zeigt.
