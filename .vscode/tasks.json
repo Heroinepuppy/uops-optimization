@@ -1,20 +1,13 @@
+
+    
+  
 {
   "version": "2.0.0",
   "tasks": [
     {
       "label": "CMake Configure",
-      "type": "process",
-      "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-G",
-        "Visual Studio 18 2026",
-        "-A",
-        "x64"
-      ],
+      "type": "shell",
+      "command": "cmake -S . -B build -G \"Visual Studio 18 2026\" -A x64",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -22,14 +15,8 @@
     },
     {
       "label": "Build Release",
-      "type": "process",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--config",
-        "Release"
-      ],
+      "type": "shell",
+      "command": "cmake --build build --config Release",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -39,9 +26,8 @@
     },
     {
       "label": "Run uop benchmark",
-      "type": "process",
+      "type": "shell",
       "command": ".\\build\\Release\\lidar_uop_benchmark.exe",
-      "args": [],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -51,9 +37,8 @@
     },
     {
       "label": "Run threading benchmark",
-      "type": "process",
+      "type": "shell",
       "command": ".\\build\\Release\\lidar_thread_scaling.exe",
-      "args": [],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -62,13 +47,9 @@
       "problemMatcher": []
     },
     {
-      "label": "Build and run all benchmarks",
-      "type": "process",
-      "command": "cmd.exe",
-      "args": [
-        "/c",
-        "echo Benchmarks complete."
-      ],
+      "label": "Build and run CPU benchmarks",
+      "type": "shell",
+      "command": "Write-Host 'CPU benchmarks complete.'",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -79,6 +60,40 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "GPU: Build",
+      "type": "shell",
+      "command": "mkdir \"build\\gpu\" 2>nul & call \"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\" -vcvars_ver=14.44 && \"C:\\Program Files\\AMD\\ROCm\\7.2\\bin\\hipcc.exe\" --offload-arch=gfx1100 -O3 -std=c++20 .\\lidar_gpu_benchmark.cpp -o .\\build\\gpu\\lidar_gpu_benchmark.exe",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": [
+            "/d",
+            "/c"
+          ]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "GPU: Run",
+      "type": "shell",
+      "command": ".\\build\\gpu\\lidar_gpu_benchmark.exe 200 256",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "C:\\Windows\\System32\\cmd.exe",
+          "args": [
+            "/d",
+            "/c"
+          ]
+        }
+      },
+      "dependsOn": "GPU: Build",
+      "dependsOrder": "sequence",
+      "problemMatcher": []
     }
   ]
 }
