@@ -703,13 +703,14 @@ static void print_stats(const std::array<std::vector<double>, 7>& samples) {
 
 static void plot_histograms(const std::array<std::vector<double>, 7>& samples) {
     const std::filesystem::path result_dir =
-        std::filesystem::current_path() / "result";
+        std::filesystem::path("results") / "data";
     std::filesystem::create_directories(result_dir);
+    std::filesystem::create_directories(result_dir.parent_path() / "pics");
 
     const std::filesystem::path png_path =
-        result_dir / "uop_benchmark.png";
+        result_dir.parent_path() / "pics" / "uop_benchmark.png";
     const std::filesystem::path script_path =
-        std::filesystem::temp_directory_path() / "lidar_uop_plot.gp";
+        result_dir / "uop_benchmark.gp";
 
     std::ofstream gp(script_path, std::ios::trunc);
     if (!gp) {
@@ -827,9 +828,11 @@ static void plot_histograms(const std::array<std::vector<double>, 7>& samples) {
     gp << "unset output\n\n";
 
     // Then open the interactive window as before.
+    if (!std::getenv("LIDAR_BATCH")) {
     gp << "set term qt size 1600,1100 enhanced font 'Segoe UI,9'\n";
     emit_layout();
 
+    }
     gp.close();
 
     std::cout << "PNG gespeichert: " << png_path << "\n";

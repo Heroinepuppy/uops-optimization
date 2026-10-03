@@ -286,13 +286,14 @@ static void create_histograms(
     const std::vector<Timing>& results)
 {
     const std::filesystem::path result_dir =
-        std::filesystem::current_path() / "result";
+        std::filesystem::path("results") / "data";
     std::filesystem::create_directories(result_dir);
+    std::filesystem::create_directories(result_dir.parent_path() / "pics");
 
     const std::filesystem::path png_path =
-        result_dir / "gpu_benchmark.png";
+        result_dir.parent_path() / "pics" / "gpu_benchmark.png";
     const std::filesystem::path script_path =
-        std::filesystem::temp_directory_path() / "hip_lidar_gpu_histograms.gp";
+        result_dir / "gpu_benchmark.gp";
 
     std::ofstream gp(script_path, std::ios::trunc);
     if (!gp) {
@@ -398,9 +399,11 @@ static void create_histograms(
     gp << "unset output\n\n";
 
     // Interactive histogram window.
+    if (!std::getenv("LIDAR_BATCH")) {
     gp << "set term qt size 1800,1200 enhanced font 'Segoe UI,9'\n";
     emit_layout();
 
+    }
     gp.close();
 
     const std::string cmd =
@@ -410,7 +413,7 @@ static void create_histograms(
 
     if (rc == 0) {
         std::cout << "Histogramm gespeichert:\n"
-                  << "  .\\result\\gpu_benchmark.png\n";
+                  << "  .\\results\\pics\\gpu_benchmark.png\n";
     } else {
         std::cerr << "Gnuplot wurde mit Fehlercode "
                   << rc << " beendet.\n";
@@ -471,9 +474,10 @@ static void write_gpu_results_txt(
     const std::vector<Timing>& results)
 {
     const std::filesystem::path result_dir =
-        std::filesystem::current_path() / "result";
+        std::filesystem::path("results") / "data";
 
     std::filesystem::create_directories(result_dir);
+    std::filesystem::create_directories(result_dir.parent_path() / "pics");
 
     const std::filesystem::path path =
         result_dir / "gpu_results.txt";

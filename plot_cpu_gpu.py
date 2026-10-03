@@ -1,3 +1,4 @@
+import os
 """Compare saved histogram peaks without running the benchmarks again."""
 
 import argparse
@@ -44,11 +45,21 @@ def read_results(path):
 
 
 def main():
+    os.chdir(Path(__file__).resolve().parent)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--result-dir", type=Path, default=Path(__file__).resolve().parent / "result")
+    parser.add_argument("--result-dir", type=Path, default=Path("results") / "data")
     parser.add_argument("--no-plot", action="store_true", help="Messwerte nur einlesen und pruefen")
     args = parser.parse_args()
-    directory = args.result_dir.resolve()
+    directory = Path(os.path.relpath(args.result_dir))
+    missing = [directory / name for name in ('cpu_results.txt', 'gpu_results.txt')
+               if not (directory / name).is_file()]
+    if missing:
+        raise ValueError(
+            'Benchmark-Ergebnisse fehlen:\n'
+            + '\n'.join(str(path) for path in missing)
+            + '\nDieses Skript zeichnet nur vorhandene Messwerte.\n'
+            'Alle Benchmarks inklusive Histogrammen und Fits starten mit:\n'
+            '  python "' + 'run_all_benchmarks.py' + '"')
     cpu = read_results(directory / "cpu_results.txt")
     gpu = read_results(directory / "gpu_results.txt")
     sizes = sorted({points for points, _ in cpu} | {points for points, _ in gpu})
@@ -75,7 +86,9 @@ def main():
     }
     columns = min(3, len(sizes))
     panel_rows = math.ceil(len(sizes) / columns)
-    image = directory / "cpu_gpu_comparison.png"
+    pictures = Path("results") / "pics"
+    pictures.mkdir(parents=True, exist_ok=True)
+    image = pictures / "cpu_gpu_comparison.png"
     commands = [
         "reset",
         f"set terminal pngcairo size {columns * 900},{panel_rows * 600} enhanced font 'Segoe UI,10'",
