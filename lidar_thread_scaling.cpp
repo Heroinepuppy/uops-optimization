@@ -1,312 +1,4 @@
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <barrier>
-#include <chrono>
-#include <cmath>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <immintrin.h>
-#include <iostream>
-#include <memory>
-#include <numeric>
-#include <random>
-#include <string>
-#include <thread>
-#include <vector>
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-
-struct Transform {
-    float r00, r01, r02;
-    float r10, r11, r12;
-    float r20, r21, r22;
-    float tx, ty, tz;
-};
-
-struct SoA {
-    std::vector<float> x, y, z;
-    std::vector<float> ox, oy, oz;
-
-    explicit SoA(std::size_t n)
-        : x(n), y(n), z(n), ox(n), oy(n), oz(n) {}
-};
-
-volatile float g_sink = 0.0f;
-
-static void pin_this_thread_to_cpu(unsigned logical_cpu) {
-    const DWORD_PTR mask = (DWORD_PTR{1} << logical_cpu);
-    if (SetThreadAffinityMask(GetCurrentThread(), mask) == 0) {
-        std::cerr << "WARNUNG: CPU-Affinitaet fuer CPU "
-                  << logical_cpu << " konnte nicht gesetzt werden.\n";
-    }
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
-}
-
-__declspec(noinline)
-void transform_soa_avx2_x2(const float* __restrict x,
-                           const float* __restrict y,
-                           const float* __restrict z,
-                           float* __restrict ox,
-                           float* __restrict oy,
-                           float* __restrict oz,
-                           std::size_t count,
-                           const Transform& t) {
-    const __m256 r00 = _mm256_set1_ps(t.r00);
-    const __m256 r01 = _mm256_set1_ps(t.r01);
-    const __m256 r02 = _mm256_set1_ps(t.r02);
-    const __m256 r10 = _mm256_set1_ps(t.r10);
-    const __m256 r11 = _mm256_set1_ps(t.r11);
-    const __m256 r12 = _mm256_set1_ps(t.r12);
-    const __m256 r20 = _mm256_set1_ps(t.r20);
-    const __m256 r21 = _mm256_set1_ps(t.r21);
-    const __m256 r22 = _mm256_set1_ps(t.r22);
-    const __m256 tx  = _mm256_set1_ps(t.tx);
-    const __m256 ty  = _mm256_set1_ps(t.ty);
-    const __m256 tz  = _mm256_set1_ps(t.tz);
-
-    std::size_t i = 0;
-
-    for (; i + 16 <= count; i += 16) {
-        const __m256 X0 = _mm256_loadu_ps(x + i);
-        const __m256 Y0 = _mm256_loadu_ps(y + i);
-        const __m256 Z0 = _mm256_loadu_ps(z + i);
-        const __m256 X1 = _mm256_loadu_ps(x + i + 8);
-        const __m256 Y1 = _mm256_loadu_ps(y + i + 8);
-        const __m256 Z1 = _mm256_loadu_ps(z + i + 8);
-
-        __m256 Xp0 = _mm256_mul_ps(r00, X0);
-        __m256 Yp0 = _mm256_mul_ps(r10, X0);
-        __m256 Zp0 = _mm256_mul_ps(r20, X0);
-        __m256 Xp1 = _mm256_mul_ps(r00, X1);
-        __m256 Yp1 = _mm256_mul_ps(r10, X1);
-        __m256 Zp1 = _mm256_mul_ps(r20, X1);
-
-        Xp0 = _mm256_fmadd_ps(r01, Y0, Xp0);
-        Yp0 = _mm256_fmadd_ps(r11, Y0, Yp0);
-        Zp0 = _mm256_fmadd_ps(r21, Y0, Zp0);
-        Xp1 = _mm256_fmadd_ps(r01, Y1, Xp1);
-        Yp1 = _mm256_fmadd_ps(r11, Y1, Yp1);
-        Zp1 = _mm256_fmadd_ps(r21, Y1, Zp1);
-
-        Xp0 = _mm256_fmadd_ps(r02, Z0, Xp0);
-        Yp0 = _mm256_fmadd_ps(r12, Z0, Yp0);
-        Zp0 = _mm256_fmadd_ps(r22, Z0, Zp0);
-        Xp1 = _mm256_fmadd_ps(r02, Z1, Xp1);
-        Yp1 = _mm256_fmadd_ps(r12, Z1, Yp1);
-        Zp1 = _mm256_fmadd_ps(r22, Z1, Zp1);
-
-        Xp0 = _mm256_add_ps(Xp0, tx);
-        Yp0 = _mm256_add_ps(Yp0, ty);
-        Zp0 = _mm256_add_ps(Zp0, tz);
-        Xp1 = _mm256_add_ps(Xp1, tx);
-        Yp1 = _mm256_add_ps(Yp1, ty);
-        Zp1 = _mm256_add_ps(Zp1, tz);
-
-        _mm256_storeu_ps(ox + i, Xp0);
-        _mm256_storeu_ps(oy + i, Yp0);
-        _mm256_storeu_ps(oz + i, Zp0);
-        _mm256_storeu_ps(ox + i + 8, Xp1);
-        _mm256_storeu_ps(oy + i + 8, Yp1);
-        _mm256_storeu_ps(oz + i + 8, Zp1);
-    }
-
-    for (; i < count; ++i) {
-        const float X = x[i], Y = y[i], Z = z[i];
-        ox[i] = t.r00 * X + t.r01 * Y + t.r02 * Z + t.tx;
-        oy[i] = t.r10 * X + t.r11 * Y + t.r12 * Z + t.ty;
-        oz[i] = t.r20 * X + t.r21 * Y + t.r22 * Z + t.tz;
-    }
-}
-
-struct CpuPairSelection {
-    unsigned base_cpu{};
-    unsigned smt_sibling{};
-    unsigned other_core_cpu{};
-    unsigned other_ccx_cpu{};
-    std::array<unsigned, 4> four_ccx_cpus{};
-    bool smt_found{false};
-    bool other_core_found{false};
-    bool other_ccx_found{false};
-    bool four_ccx_found{false};
-};
-
-static std::vector<unsigned> cpus_from_mask(KAFFINITY mask) {
-    std::vector<unsigned> cpus;
-    for (unsigned bit = 0; bit < sizeof(KAFFINITY) * 8; ++bit) {
-        if (mask & (KAFFINITY{1} << bit)) cpus.push_back(bit);
-    }
-    return cpus;
-}
-
-static CpuPairSelection select_cpu_pairs(unsigned requested_cpu) {
-    CpuPairSelection result{};
-    result.base_cpu = requested_cpu;
-
-    // --- Physical core topology ---
-    DWORD core_len = 0;
-    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &core_len);
-    if (!core_len) return result;
-
-    std::vector<unsigned char> core_buffer(core_len);
-    auto* core_info =
-        reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(core_buffer.data());
-
-    if (!GetLogicalProcessorInformationEx(
-            RelationProcessorCore, core_info, &core_len)) {
-        return result;
-    }
-
-    std::vector<std::vector<unsigned>> cores;
-    unsigned offset = 0;
-
-    while (offset < core_len) {
-        auto* e = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
-            core_buffer.data() + offset);
-
-        if (e->Relationship == RelationProcessorCore) {
-            std::vector<unsigned> core;
-
-            for (WORD g = 0; g < e->Processor.GroupCount; ++g) {
-                const auto& gm = e->Processor.GroupMask[g];
-                if (gm.Group == 0) {
-                    auto part = cpus_from_mask(gm.Mask);
-                    core.insert(core.end(), part.begin(), part.end());
-                }
-            }
-
-            if (!core.empty()) cores.push_back(std::move(core));
-        }
-
-        offset += e->Size;
-    }
-
-    std::size_t base_core_index = static_cast<std::size_t>(-1);
-
-    for (std::size_t i = 0; i < cores.size(); ++i) {
-        if (std::find(cores[i].begin(), cores[i].end(), requested_cpu)
-            != cores[i].end()) {
-
-            base_core_index = i;
-
-            for (unsigned cpu : cores[i]) {
-                if (cpu != requested_cpu) {
-                    result.smt_sibling = cpu;
-                    result.smt_found = true;
-                    break;
-                }
-            }
-
-            break;
-        }
-    }
-
-    // Pick another physical core without caring about CCX.
-    if (base_core_index != static_cast<std::size_t>(-1)) {
-        for (std::size_t i = 0; i < cores.size(); ++i) {
-            if (i == base_core_index || cores[i].empty()) continue;
-            result.other_core_cpu = cores[i].front();
-            result.other_core_found = true;
-            break;
-        }
-    }
-
-    // --- L3 / CCX topology ---
-    // On Zen 2 desktop Ryzen, each CCX has its own 16 MB L3 slice.
-    // Windows exposes the sharing mask for each L3 cache via RelationCache.
-    DWORD cache_len = 0;
-    GetLogicalProcessorInformationEx(RelationCache, nullptr, &cache_len);
-
-    if (cache_len) {
-        std::vector<unsigned char> cache_buffer(cache_len);
-        auto* cache_info =
-            reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
-                cache_buffer.data());
-
-        if (GetLogicalProcessorInformationEx(
-                RelationCache, cache_info, &cache_len)) {
-
-            std::vector<KAFFINITY> l3_masks;
-            unsigned cache_offset = 0;
-
-            while (cache_offset < cache_len) {
-                auto* e =
-                    reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
-                        cache_buffer.data() + cache_offset);
-
-                if (e->Relationship == RelationCache &&
-                    e->Cache.Level == 3 &&
-                    e->Cache.GroupMask.Group == 0) {
-                    l3_masks.push_back(e->Cache.GroupMask.Mask);
-                }
-
-                cache_offset += e->Size;
-            }
-
-            KAFFINITY base_l3_mask = 0;
-            for (KAFFINITY mask : l3_masks) {
-                if (mask & (KAFFINITY{1} << requested_cpu)) {
-                    base_l3_mask = mask;
-                    break;
-                }
-            }
-
-            if (base_l3_mask != 0) {
-                // Select one logical processor from each of the four distinct
-                // L3 sharing groups. On Ryzen 9 3950X these are the four CCXs.
-                result.four_ccx_cpus[0] = requested_cpu;
-                std::size_t ccx_slot = 1;
-
-                for (KAFFINITY mask : l3_masks) {
-                    if (mask == base_l3_mask || ccx_slot >= 4) continue;
-
-                    const auto ccx_cpus = cpus_from_mask(mask);
-                    if (!ccx_cpus.empty()) {
-                        result.four_ccx_cpus[ccx_slot++] = ccx_cpus.front();
-                    }
-                }
-
-                result.four_ccx_found = (ccx_slot == 4);
-
-                // Choose a logical CPU that belongs to a DIFFERENT L3 sharing
-                // group and is therefore on another Zen-2 CCX.
-                for (KAFFINITY mask : l3_masks) {
-                    if (mask == base_l3_mask) continue;
-
-                    const auto cpus = cpus_from_mask(mask);
-
-                    for (unsigned cpu : cpus) {
-                        // Prefer one hardware thread from a physical core.
-                        bool different_physical_core = true;
-
-                        if (base_core_index != static_cast<std::size_t>(-1)) {
-                            if (std::find(
-                                    cores[base_core_index].begin(),
-                                    cores[base_core_index].end(),
-                                    cpu) != cores[base_core_index].end()) {
-                                different_physical_core = false;
-                            }
-                        }
-
-                        if (different_physical_core) {
-                            result.other_ccx_cpu = cpu;
-                            result.other_ccx_found = true;
-                            break;
-                        }
-                    }
-
-                    if (result.other_ccx_found) break;
-                }
-            }
-        }
-    }
-
-    return result;
-}
+#include "lidar_cpu_core.h"
 
 class ParallelTeam {
 public:
@@ -468,6 +160,86 @@ struct CaseResult {
     std::vector<double> samples;
 };
 
+struct HistogramPeak {
+    double center_us{};
+    std::size_t count{};
+};
+
+static HistogramPeak histogram_peak(
+    const std::vector<double>& samples,
+    int bins = 60) {
+
+    if (samples.empty()) return {};
+
+    const auto [min_it, max_it] =
+        std::minmax_element(samples.begin(), samples.end());
+
+    double lo = *min_it;
+    double hi = *max_it;
+    if (hi <= lo) hi = lo + 1.0;
+
+    const double width = (hi - lo) / static_cast<double>(bins);
+    std::vector<std::size_t> counts(static_cast<std::size_t>(bins), 0);
+
+    for (double v : samples) {
+        int b = static_cast<int>((v - lo) / width);
+        b = std::clamp(b, 0, bins - 1);
+        counts[static_cast<std::size_t>(b)]++;
+    }
+
+    const auto max_it_count =
+        std::max_element(counts.begin(), counts.end());
+    const std::size_t index =
+        static_cast<std::size_t>(std::distance(counts.begin(), max_it_count));
+
+    return {
+        lo + (static_cast<double>(index) + 0.5) * width,
+        *max_it_count
+    };
+}
+
+static std::string read_text_file(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return {};
+    return std::string(
+        std::istreambuf_iterator<char>(in),
+        std::istreambuf_iterator<char>());
+}
+
+static void replace_results_section(
+    const std::filesystem::path& path,
+    const std::string& section_name,
+    const std::string& section_body) {
+
+    std::filesystem::create_directories(path.parent_path());
+
+    std::string text = read_text_file(path);
+    const std::string begin = "### BEGIN " + section_name + "\n";
+    const std::string end   = "### END " + section_name + "\n";
+
+    const auto p0 = text.find(begin);
+    if (p0 != std::string::npos) {
+        const auto p1 = text.find(end, p0);
+        if (p1 != std::string::npos) {
+            text.erase(p0, p1 + end.size() - p0);
+        }
+    }
+
+    if (!text.empty() && text.back() != '\n') text.push_back('\n');
+    if (!text.empty()) text.push_back('\n');
+
+    text += begin;
+    text += section_body;
+    if (!section_body.empty() && section_body.back() != '\n') text.push_back('\n');
+    text += end;
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        throw std::runtime_error("CPU-Ergebnisdatei konnte nicht geoeffnet werden.");
+    }
+    out << text;
+}
+
 static double measure_block_ms(Mode mode, std::size_t repeats,
                                SoA& soa, const Transform& t,
                                ParallelTeam* smt,
@@ -531,10 +303,9 @@ static void fill_points(SoA& soa, std::mt19937& rng) {
     }
 }
 
-static std::array<CaseResult, 4> run_size(
+static std::array<CaseResult, 5> run_size(
     std::size_t points, int rounds, double target_ms,
-    const CpuPairSelection& cpus, const Transform& t,
-    bool include_single) {
+    const CpuPairSelection& cpus, const Transform& t) {
 
     SoA soa(points);
     std::mt19937 rng(static_cast<unsigned>(0x3950u + points));
@@ -543,6 +314,7 @@ static std::array<CaseResult, 4> run_size(
     std::unique_ptr<ParallelTeam> smt;
     std::unique_ptr<ParallelTeam> two_core;
     std::unique_ptr<ParallelTeam> two_core_other_ccx;
+    std::unique_ptr<ParallelTeam4> four_core_four_ccx;
 
     if (cpus.smt_found)
         smt = std::make_unique<ParallelTeam>(
@@ -556,55 +328,79 @@ static std::array<CaseResult, 4> run_size(
         two_core_other_ccx = std::make_unique<ParallelTeam>(
             soa, t, points, cpus.base_cpu, cpus.other_ccx_cpu);
 
-    std::array<Mode, 4> modes = {
+    if (cpus.four_ccx_found)
+        four_core_four_ccx = std::make_unique<ParallelTeam4>(
+            soa, t, points, cpus.four_ccx_cpus);
+
+    std::array<Mode, 5> modes = {
         Mode::Single,
         Mode::SMT,
         Mode::TwoCore,
-        Mode::TwoCoreOtherCCX
+        Mode::TwoCoreOtherCCX,
+        Mode::FourCoreFourCCX
     };
 
-    std::array<std::string, 4> names = {
+    std::array<std::string, 5> names = {
         "1 Thread",
         "2 Threads / 1 Core SMT",
         "2 Threads / 2 Cores same CCX",
-        "2 Threads / 2 Cores different CCX"
+        "2 Threads / 2 Cores different CCX",
+        "4 Threads / 4 Cores / 4 CCX"
     };
 
-    std::array<std::size_t, 4> repeats{};
-    std::array<CaseResult, 4> results = {{
+    std::array<std::size_t, 5> repeats{};
+    std::array<CaseResult, 5> results = {{
         {names[0], points, {}},
         {names[1], points, {}},
         {names[2], points, {}},
-        {names[3], points, {}}
+        {names[3], points, {}},
+        {names[4], points, {}}
     }};
 
     std::cout << "\n" << points << " Punkte\n";
-    std::cout << "Kalibriere Threading-Blocklaengen...\n";
+    std::cout << "Kalibriere CPU-Blocklaengen...\n";
 
-    for (int i = 0; i < 4; ++i) {
-        if (i == 0 && !include_single) continue;
+    for (int i = 0; i < 5; ++i) {
+        if (points > 800'000 && i != 4) continue;
+
         if (i == 1 && !smt) continue;
         if (i == 2 && !two_core) continue;
         if (i == 3 && !two_core_other_ccx) continue;
+        if (i == 4 && !four_core_four_ccx) continue;
 
         repeats[i] = calibrate(
             modes[i], target_ms, soa, t,
-            smt.get(), two_core.get(), two_core_other_ccx.get(), nullptr);
+            smt.get(), two_core.get(), two_core_other_ccx.get(),
+            four_core_four_ccx.get());
 
         const double ms = measure_block_ms(
             modes[i], repeats[i], soa, t,
-            smt.get(), two_core.get(), two_core_other_ccx.get(), nullptr);
+            smt.get(), two_core.get(), two_core_other_ccx.get(),
+            four_core_four_ccx.get());
 
-        std::cout << "  " << std::setw(24) << std::left << names[i]
+        std::cout << "  " << std::setw(32) << std::left << names[i]
                   << ": " << repeats[i] << " Clouds/Block"
-                  << " (~" << std::fixed << std::setprecision(1) << ms << " ms)\n";
+                  << " (~" << std::fixed << std::setprecision(1) << ms << " ms)"
+                  << " = " << std::setprecision(2)
+                  << (ms * 1000.0 / static_cast<double>(repeats[i]))
+                  << " us/Cloud\n";
 
         results[i].samples.reserve(rounds);
     }
 
     std::vector<int> active;
-    for (int i = 0; i < 4; ++i) {
-        if (repeats[i] != 0) active.push_back(i);
+
+    // Bis einschließlich 800k messen wir weiterhin alle CPU-Varianten.
+    // Oberhalb davon verwenden wir nur noch den bisher schnellsten bekannten
+    // CPU-Pfad: 4 Threads / 4 Cores / 4 CCX.
+    if (points <= 800'000) {
+        for (int i = 0; i < 5; ++i) {
+            if (repeats[i] != 0) active.push_back(i);
+        }
+    } else {
+        if (repeats[4] != 0) {
+            active.push_back(4);
+        }
     }
 
     std::mt19937 order_rng(static_cast<unsigned>(0xA000u + points));
@@ -616,7 +412,8 @@ static std::array<CaseResult, 4> run_size(
         for (int i : active) {
             const double total_ms = measure_block_ms(
                 modes[i], repeats[i], soa, t,
-                smt.get(), two_core.get(), two_core_other_ccx.get(), nullptr);
+                smt.get(), two_core.get(), two_core_other_ccx.get(),
+                four_core_four_ccx.get());
 
             results[i].samples.push_back(
                 total_ms * 1000.0 / static_cast<double>(repeats[i]));
@@ -633,87 +430,8 @@ static std::array<CaseResult, 4> run_size(
 }
 
 
-static CaseResult run_800k_four_ccx(
-    int rounds,
-    double target_ms,
-    const CpuPairSelection& cpus,
-    const Transform& t) {
 
-    constexpr std::size_t points = 800'000;
-    CaseResult result{"4 Threads / 4 Cores / 4 CCX", points, {}};
-
-    if (!cpus.four_ccx_found) {
-        std::cerr << "4-CCX-Test uebersprungen: vier verschiedene L3/CCX-Gruppen "
-                     "konnten nicht gefunden werden.\n";
-        return result;
-    }
-
-    SoA soa(points);
-    std::mt19937 rng(0x4CC800u);
-    fill_points(soa, rng);
-
-    ParallelTeam4 team(soa, t, points, cpus.four_ccx_cpus);
-
-    for (int i = 0; i < 8; ++i) {
-        team.run_once();
-    }
-
-    auto measure = [&](std::size_t repeats) {
-        using clock = std::chrono::steady_clock;
-        const auto begin = clock::now();
-
-        for (std::size_t i = 0; i < repeats; ++i) {
-            team.run_once();
-            g_sink = g_sink + soa.ox[points / 2];
-        }
-
-        const auto end = clock::now();
-        return std::chrono::duration<double, std::milli>(end - begin).count();
-    };
-
-    std::size_t repeats = 1;
-    while (repeats < 100000) {
-        const double ms = measure(repeats);
-        if (ms >= 5.0) {
-            repeats = std::max<std::size_t>(
-                1,
-                static_cast<std::size_t>(
-                    std::llround(static_cast<double>(repeats) * target_ms / ms)));
-            break;
-        }
-        repeats *= 2;
-    }
-
-    const double cal_ms = measure(repeats);
-    std::cout << "\n800000 Punkte - 4 Cores / 4 CCX\n";
-    std::cout << "Kalibriere 4-CCX-Blocklaenge...\n";
-    std::cout << "  4 Threads / 4 Cores / 4 CCX : "
-              << repeats << " Clouds/Block"
-              << " (~" << std::fixed << std::setprecision(1)
-              << cal_ms << " ms)"
-              << " = " << std::setprecision(2)
-              << (cal_ms * 1000.0 / static_cast<double>(repeats))
-              << " us/Cloud\n";
-
-    result.samples.reserve(rounds);
-
-    std::cout << "Benchmark laeuft...\n";
-    for (int round = 0; round < rounds; ++round) {
-        const double total_ms = measure(repeats);
-        result.samples.push_back(
-            total_ms * 1000.0 / static_cast<double>(repeats));
-
-        if ((round + 1) % 50 == 0 || round + 1 == rounds) {
-            std::cout << "\r  Runde " << std::setw(4) << (round + 1)
-                      << " / " << rounds << std::flush;
-        }
-    }
-    std::cout << "\n";
-
-    return result;
-}
-
-static void print_results(const std::array<CaseResult, 4>& results) {
+static void print_results(const std::array<CaseResult, 5>& results) {
     for (const auto& r : results) {
         if (r.samples.empty()) continue;
         const Stats s = compute_stats(r.samples);
@@ -776,9 +494,19 @@ static void plot_threading(const std::vector<CaseResult>& all) {
         ++block;
     }
 
+    if (block == 0) return;
+
+    constexpr int columns = 5;
+    const int rows = (block + columns - 1) / columns;
+
     auto emit_layout = [&]() {
-        gp << "set multiplot layout 6,2 rowsfirst title "
-              "'LiDAR Thread Scaling - same CCX vs different CCX' font ',14'\n";
+        // Start each terminal with a clean full-canvas layout. Otherwise the
+        // interactive plot can inherit the last PNG panel's origin and labels.
+        gp << "reset\n";
+        gp << "set origin 0,0\nset size 1,1\n";
+        gp << "set multiplot layout " << rows << "," << columns
+           << " rowsfirst title "
+              "'LiDAR CPU Benchmark - Laufzeitverteilungen' font ',14'\n";
         gp << "set style fill solid 0.70 border -1\n";
         gp << "set boxwidth 0.90 relative\n";
         gp << "set grid ytics\n";
@@ -793,8 +521,11 @@ static void plot_threading(const std::vector<CaseResult>& all) {
                << "k - " << r.name << "'\n";
             gp << "set xlabel 'us pro komplette Cloud'\n";
             gp << "set ylabel 'Anzahl Messbloecke'\n";
-            gp << "set autoscale x\n";
-            gp << "set autoscale y\n";
+            if (r.points == 25'600'000)
+                gp << "set xrange [0:30000]\n";
+            else
+                gp << "set xrange [0:*]\n";
+            gp << "set yrange [0:*]\n";
             gp << "plot $H" << plot_block++
                << " using 1:2 with boxes\n";
         }
@@ -803,13 +534,14 @@ static void plot_threading(const std::vector<CaseResult>& all) {
     };
 
     // Save a persistent result image.
-    gp << "set term pngcairo size 1920,1900 enhanced font 'Segoe UI,9'\n";
+    gp << "set term pngcairo size 3200," << rows * 500
+       << " enhanced font 'Segoe UI,8'\n";
     gp << "set output '" << png_path.generic_string() << "'\n";
     emit_layout();
     gp << "unset output\n\n";
 
     // Keep the interactive Gnuplot window too.
-    gp << "set term qt size 1600,1900 enhanced font 'Segoe UI,9'\n";
+    gp << "set term qt size 1900,1200 enhanced font 'Segoe UI,8'\n";
     emit_layout();
 
     gp.close();
@@ -821,6 +553,30 @@ static void plot_threading(const std::vector<CaseResult>& all) {
         "gnuplot -persist \"" + script.string() + "\"";
     std::system(cmd.c_str());
 }
+
+static void write_cpu_results(const std::vector<CaseResult>& all) {
+    const std::filesystem::path path =
+        std::filesystem::current_path() / "result" / "cpu_results.txt";
+
+    std::ostringstream body;
+    body << "Histogram bins: 60\n";
+    body << "Peak = center of histogram bin with highest sample count\n";
+    body << "points;method;peak_us;peak_count;samples\n";
+
+    for (const auto& r : all) {
+        if (r.samples.empty()) continue;
+        const auto peak = histogram_peak(r.samples, 60);
+        body << r.points << ";"
+             << r.name << ";"
+             << std::fixed << std::setprecision(3) << peak.center_us << ";"
+             << peak.count << ";"
+             << r.samples.size() << "\n";
+    }
+
+    replace_results_section(path, "CPU", body.str());
+    std::cout << "CPU-Peaks gespeichert: " << path << "\n";
+}
+
 
 int main(int argc, char** argv) {
     int rounds = 1000;
@@ -838,7 +594,7 @@ int main(int argc, char** argv) {
     const auto cpus = select_cpu_pairs(logical_cpu);
 
     std::cout << "LiDAR Thread Scaling Benchmark\n"
-              << "Version       : 4CCX-800K-v1\n"
+              << "Version       : CPU-SIZE-SWEEP-FASTEST-v2\n"
               << "------------------------------\n"
               << "Kernel        : AVX2 Zen2 x2\n"
               << "Messrunden    : " << rounds << "\n"
@@ -857,82 +613,62 @@ int main(int argc, char** argv) {
          1.25f,         -3.50f,         0.75f
     };
 
-    // 200k: only the two new threading cases. The single-thread reference
-    // already exists in the uop benchmark.
-    auto r200 = run_size(200'000, rounds, target_ms, cpus, t, false);
+    const std::array<std::size_t, 8> point_counts = {
+        200'000,
+        400'000,
+        800'000,
+        1'600'000,
+        3'200'000,
+        6'400'000,
+        12'800'000,
+        25'600'000
+    };
 
-    // 400k: fresh 1-thread baseline + SMT + 2 physical cores.
-    auto r400 = run_size(400'000, rounds, target_ms, cpus, t, true);
+    std::vector<std::array<CaseResult, 5>> all_sizes;
+    all_sizes.reserve(point_counts.size());
 
-    // 800k: double the workload again. This helps reveal whether the fixed
-    // barrier/synchronization overhead becomes less important as useful work grows.
-    auto r800 = run_size(800'000, rounds, target_ms, cpus, t, true);
-
-    // Final topology test: ONLY for 800k points.
-    auto r800_four_ccx = run_800k_four_ccx(rounds, target_ms, cpus, t);
-
-    std::cout << "\n=== 200k Threading ===\n";
-    print_results(r200);
-
-    std::cout << "\n=== 400k Threading ===\n";
-    print_results(r400);
-
-    std::cout << "\n=== 800k Threading ===\n";
-    print_results(r800);
-
-    if (!r800_four_ccx.samples.empty()) {
-        const Stats s4 = compute_stats(r800_four_ccx.samples);
-        std::cout << std::left << std::setw(32)
-                  << r800_four_ccx.name
-                  << " median " << std::right << std::fixed << std::setprecision(2)
-                  << std::setw(8) << s4.median << " us"
-                  << " | p95 " << std::setw(8) << s4.p95
-                  << " | stddev " << std::setw(8) << s4.stddev << "\n";
+    for (std::size_t points : point_counts) {
+        all_sizes.push_back(
+            run_size(points, rounds, target_ms, cpus, t));
     }
 
-    auto print_speedup = [](const char* label,
-                            const std::array<CaseResult, 4>& results) {
-        if (results[0].samples.empty()) return;
+    for (std::size_t i = 0; i < point_counts.size(); ++i) {
+        std::cout << "\n=== " << point_counts[i] << " Punkte CPU ===\n";
+        print_results(all_sizes[i]);
 
-        const double base = compute_stats(results[0].samples).median;
-        std::cout << "\n" << label << " Speedup gegen 1 Thread:\n";
+        if (all_sizes[i][0].samples.empty()) continue;
 
-        for (int i = 1; i < 4; ++i) {
-            if (results[i].samples.empty()) continue;
-            const double med = compute_stats(results[i].samples).median;
-            std::cout << "  " << std::setw(24) << std::left << results[i].name
+        const double base =
+            compute_stats(all_sizes[i][0].samples).median;
+
+        std::cout << "Speedup gegen 1 Thread:\n";
+        for (int c = 1; c < 5; ++c) {
+            if (all_sizes[i][c].samples.empty()) continue;
+            const double med =
+                compute_stats(all_sizes[i][c].samples).median;
+
+            std::cout << "  "
+                      << std::setw(32) << std::left
+                      << all_sizes[i][c].name
                       << ": " << std::fixed << std::setprecision(3)
                       << base / med << "x\n";
         }
-    };
+    }
 
-    print_speedup("400k", r400);
-    print_speedup("800k", r800);
+    std::vector<CaseResult> result_cases;
+    for (auto& size_results : all_sizes) {
+        for (auto& r : size_results) {
+            if (!r.samples.empty()) {
+                result_cases.push_back(std::move(r));
+            }
+        }
+    }
+
+    write_cpu_results(result_cases);
 
     if (show_plot) {
-        std::vector<CaseResult> plot_cases;
-        // 200k: SMT + same-CCX + different-CCX.
-        plot_cases.push_back(std::move(r200[1]));
-        plot_cases.push_back(std::move(r200[2]));
-        plot_cases.push_back(std::move(r200[3]));
-
-        // 400k all four.
-        plot_cases.push_back(std::move(r400[0]));
-        plot_cases.push_back(std::move(r400[1]));
-        plot_cases.push_back(std::move(r400[2]));
-        plot_cases.push_back(std::move(r400[3]));
-
-        // 800k all four.
-        plot_cases.push_back(std::move(r800[0]));
-        plot_cases.push_back(std::move(r800[1]));
-        plot_cases.push_back(std::move(r800[2]));
-        plot_cases.push_back(std::move(r800[3]));
-        if (!r800_four_ccx.samples.empty()) {
-            plot_cases.push_back(std::move(r800_four_ccx));
-        }
-
-        std::cout << "\nOeffne separaten Threading-Plot...\n";
-        plot_threading(plot_cases);
+        std::cout << "\nOeffne CPU-Histogramme...\n";
+        plot_threading(result_cases);
     }
 
     std::cout << "\nSink: " << g_sink << "\n";

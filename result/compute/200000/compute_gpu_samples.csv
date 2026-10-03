@@ -1,0 +1,881 @@
+points;transformations;method;sample;us
+200000;1;GPU kernel only;0;23.7000007182
+200000;1;GPU kernel only;1;21.7000003904
+200000;1;GPU kernel only;2;19.430000335
+200000;1;GPU kernel only;3;0.699999975041
+200000;1;GPU kernel only;4;18.7400002033
+200000;1;GPU kernel only;5;21.7000003904
+200000;1;GPU kernel only;6;22.6000007242
+200000;1;GPU kernel only;7;17.4000002444
+200000;1;GPU kernel only;8;29.3600000441
+200000;1;GPU kernel only;9;20.300000906
+200000;1;GPU kernel only;10;19.3000007421
+200000;1;GPU kernel only;11;17.5999999046
+200000;1;GPU kernel only;12;19.8999997228
+200000;1;GPU kernel only;13;24.9600000679
+200000;1;GPU kernel only;14;49.4999997318
+200000;1;GPU kernel only;15;18.0300008506
+200000;1;GPU kernel only;16;19.0500002354
+200000;1;GPU kernel only;17;22.4099997431
+200000;1;GPU kernel only;18;21.8199994415
+200000;1;GPU kernel only;19;98.1699973345
+200000;1;GPU resident (host sync);0;65.5
+200000;1;GPU resident (host sync);1;60.4
+200000;1;GPU resident (host sync);2;56.2
+200000;1;GPU resident (host sync);3;58.2
+200000;1;GPU resident (host sync);4;57
+200000;1;GPU resident (host sync);5;60.6
+200000;1;GPU resident (host sync);6;52.1
+200000;1;GPU resident (host sync);7;53.4
+200000;1;GPU resident (host sync);8;49.5
+200000;1;GPU resident (host sync);9;58.5
+200000;1;GPU resident (host sync);10;51.5
+200000;1;GPU resident (host sync);11;52.1
+200000;1;GPU resident (host sync);12;52
+200000;1;GPU resident (host sync);13;56.4
+200000;1;GPU resident (host sync);14;50.4
+200000;1;GPU resident (host sync);15;43.8
+200000;1;GPU resident (host sync);16;42.6
+200000;1;GPU resident (host sync);17;85
+200000;1;GPU resident (host sync);18;45.2
+200000;1;GPU resident (host sync);19;51.5
+200000;1;Upload + GPU;0;559.9
+200000;1;Upload + GPU;1;600.2
+200000;1;Upload + GPU;2;546.3
+200000;1;Upload + GPU;3;577.7
+200000;1;Upload + GPU;4;566.1
+200000;1;Upload + GPU;5;575.5
+200000;1;Upload + GPU;6;567.1
+200000;1;Upload + GPU;7;653.2
+200000;1;Upload + GPU;8;831.4
+200000;1;Upload + GPU;9;513.1
+200000;1;Upload + GPU;10;638.8
+200000;1;Upload + GPU;11;494
+200000;1;Upload + GPU;12;491.9
+200000;1;Upload + GPU;13;531.6
+200000;1;Upload + GPU;14;618.6
+200000;1;Upload + GPU;15;471.7
+200000;1;Upload + GPU;16;415.2
+200000;1;Upload + GPU;17;433.7
+200000;1;Upload + GPU;18;474.3
+200000;1;Upload + GPU;19;457.7
+200000;1;Upload + GPU + Download;0;1078.9
+200000;1;Upload + GPU + Download;1;1048.5
+200000;1;Upload + GPU + Download;2;1119.8
+200000;1;Upload + GPU + Download;3;1236.6
+200000;1;Upload + GPU + Download;4;1130.9
+200000;1;Upload + GPU + Download;5;1318.8
+200000;1;Upload + GPU + Download;6;1050.8
+200000;1;Upload + GPU + Download;7;1020
+200000;1;Upload + GPU + Download;8;1205.9
+200000;1;Upload + GPU + Download;9;996.9
+200000;1;Upload + GPU + Download;10;1050.3
+200000;1;Upload + GPU + Download;11;1011.5
+200000;1;Upload + GPU + Download;12;1153.5
+200000;1;Upload + GPU + Download;13;1158.8
+200000;1;Upload + GPU + Download;14;904.8
+200000;1;Upload + GPU + Download;15;1146
+200000;1;Upload + GPU + Download;16;835.6
+200000;1;Upload + GPU + Download;17;1129.1
+200000;1;Upload + GPU + Download;18;1038.1
+200000;1;Upload + GPU + Download;19;871.9
+200000;2;GPU kernel only;0;13.9600001276
+200000;2;GPU kernel only;1;21.7099990696
+200000;2;GPU kernel only;2;22.1500005573
+200000;2;GPU kernel only;3;21.5300004929
+200000;2;GPU kernel only;4;20.0100000948
+200000;2;GPU kernel only;5;0.699999975041
+200000;2;GPU kernel only;6;33.1799983978
+200000;2;GPU kernel only;7;20.6000003964
+200000;2;GPU kernel only;8;41.2699989974
+200000;2;GPU kernel only;9;7.0799998939
+200000;2;GPU kernel only;10;17.0900002122
+200000;2;GPU kernel only;11;21.7499993742
+200000;2;GPU kernel only;12;19.3799994886
+200000;2;GPU kernel only;13;21.8899995089
+200000;2;GPU kernel only;14;20.9500007331
+200000;2;GPU kernel only;15;23.0800006539
+200000;2;GPU kernel only;16;26.2299999595
+200000;2;GPU kernel only;17;19.6299999952
+200000;2;GPU kernel only;18;11.979999952
+200000;2;GPU kernel only;19;27.0600002259
+200000;2;GPU resident (host sync);0;43.8
+200000;2;GPU resident (host sync);1;46.9
+200000;2;GPU resident (host sync);2;43.9
+200000;2;GPU resident (host sync);3;42.8
+200000;2;GPU resident (host sync);4;44.1
+200000;2;GPU resident (host sync);5;50.3
+200000;2;GPU resident (host sync);6;44.6
+200000;2;GPU resident (host sync);7;46.6
+200000;2;GPU resident (host sync);8;43.5
+200000;2;GPU resident (host sync);9;47.1
+200000;2;GPU resident (host sync);10;44.8
+200000;2;GPU resident (host sync);11;43.2
+200000;2;GPU resident (host sync);12;44.1
+200000;2;GPU resident (host sync);13;49.4
+200000;2;GPU resident (host sync);14;44.6
+200000;2;GPU resident (host sync);15;42.2
+200000;2;GPU resident (host sync);16;47.1
+200000;2;GPU resident (host sync);17;47.4
+200000;2;GPU resident (host sync);18;42.6
+200000;2;GPU resident (host sync);19;44.7
+200000;2;Upload + GPU;0;443.5
+200000;2;Upload + GPU;1;410.9
+200000;2;Upload + GPU;2;485.2
+200000;2;Upload + GPU;3;436.9
+200000;2;Upload + GPU;4;417.5
+200000;2;Upload + GPU;5;609.5
+200000;2;Upload + GPU;6;492.4
+200000;2;Upload + GPU;7;425.9
+200000;2;Upload + GPU;8;700
+200000;2;Upload + GPU;9;477.8
+200000;2;Upload + GPU;10;544.5
+200000;2;Upload + GPU;11;481
+200000;2;Upload + GPU;12;431.8
+200000;2;Upload + GPU;13;537.7
+200000;2;Upload + GPU;14;422.4
+200000;2;Upload + GPU;15;559.7
+200000;2;Upload + GPU;16;552.6
+200000;2;Upload + GPU;17;413.4
+200000;2;Upload + GPU;18;468.9
+200000;2;Upload + GPU;19;438
+200000;2;Upload + GPU + Download;0;970.5
+200000;2;Upload + GPU + Download;1;843.5
+200000;2;Upload + GPU + Download;2;1111.7
+200000;2;Upload + GPU + Download;3;1010.4
+200000;2;Upload + GPU + Download;4;889.4
+200000;2;Upload + GPU + Download;5;926.7
+200000;2;Upload + GPU + Download;6;824.5
+200000;2;Upload + GPU + Download;7;832.6
+200000;2;Upload + GPU + Download;8;1063.1
+200000;2;Upload + GPU + Download;9;921.2
+200000;2;Upload + GPU + Download;10;1037.8
+200000;2;Upload + GPU + Download;11;889.8
+200000;2;Upload + GPU + Download;12;1002.1
+200000;2;Upload + GPU + Download;13;908.1
+200000;2;Upload + GPU + Download;14;872.9
+200000;2;Upload + GPU + Download;15;910
+200000;2;Upload + GPU + Download;16;891.8
+200000;2;Upload + GPU + Download;17;874.8
+200000;2;Upload + GPU + Download;18;1175.7
+200000;2;Upload + GPU + Download;19;1104.6
+200000;4;GPU kernel only;0;20.0699996203
+200000;4;GPU kernel only;1;23.3500003815
+200000;4;GPU kernel only;2;21.7000003904
+200000;4;GPU kernel only;3;21.649999544
+200000;4;GPU kernel only;4;20.0100000948
+200000;4;GPU kernel only;5;49.3000000715
+200000;4;GPU kernel only;6;20.9999997169
+200000;4;GPU kernel only;7;21.7700004578
+200000;4;GPU kernel only;8;20.1999992132
+200000;4;GPU kernel only;9;21.970000118
+200000;4;GPU kernel only;10;21.740000695
+200000;4;GPU kernel only;11;22.8000003844
+200000;4;GPU kernel only;12;19.109999761
+200000;4;GPU kernel only;13;21.5900000185
+200000;4;GPU kernel only;14;22.1599992365
+200000;4;GPU kernel only;15;23.1599994004
+200000;4;GPU kernel only;16;20.2300008386
+200000;4;GPU kernel only;17;22.1100002527
+200000;4;GPU kernel only;18;21.4900001884
+200000;4;GPU kernel only;19;22.6499997079
+200000;4;GPU resident (host sync);0;44.5
+200000;4;GPU resident (host sync);1;48
+200000;4;GPU resident (host sync);2;43.6
+200000;4;GPU resident (host sync);3;44.9
+200000;4;GPU resident (host sync);4;44.2
+200000;4;GPU resident (host sync);5;46.5
+200000;4;GPU resident (host sync);6;42.3
+200000;4;GPU resident (host sync);7;42.4
+200000;4;GPU resident (host sync);8;45
+200000;4;GPU resident (host sync);9;47.5
+200000;4;GPU resident (host sync);10;43.3
+200000;4;GPU resident (host sync);11;43.2
+200000;4;GPU resident (host sync);12;43.5
+200000;4;GPU resident (host sync);13;47.5
+200000;4;GPU resident (host sync);14;44.2
+200000;4;GPU resident (host sync);15;42.9
+200000;4;GPU resident (host sync);16;43.8
+200000;4;GPU resident (host sync);17;48.1
+200000;4;GPU resident (host sync);18;39.9
+200000;4;GPU resident (host sync);19;43.6
+200000;4;Upload + GPU;0;441.6
+200000;4;Upload + GPU;1;420.6
+200000;4;Upload + GPU;2;414
+200000;4;Upload + GPU;3;470.3
+200000;4;Upload + GPU;4;526.8
+200000;4;Upload + GPU;5;458.2
+200000;4;Upload + GPU;6;474.3
+200000;4;Upload + GPU;7;447.1
+200000;4;Upload + GPU;8;465.1
+200000;4;Upload + GPU;9;787.8
+200000;4;Upload + GPU;10;433.4
+200000;4;Upload + GPU;11;553.4
+200000;4;Upload + GPU;12;420.3
+200000;4;Upload + GPU;13;422.8
+200000;4;Upload + GPU;14;451.2
+200000;4;Upload + GPU;15;537.7
+200000;4;Upload + GPU;16;481.8
+200000;4;Upload + GPU;17;556.8
+200000;4;Upload + GPU;18;524.8
+200000;4;Upload + GPU;19;735.7
+200000;4;Upload + GPU + Download;0;953.9
+200000;4;Upload + GPU + Download;1;841.8
+200000;4;Upload + GPU + Download;2;843
+200000;4;Upload + GPU + Download;3;917.8
+200000;4;Upload + GPU + Download;4;927.4
+200000;4;Upload + GPU + Download;5;925.9
+200000;4;Upload + GPU + Download;6;1013.4
+200000;4;Upload + GPU + Download;7;878.6
+200000;4;Upload + GPU + Download;8;949
+200000;4;Upload + GPU + Download;9;1023.2
+200000;4;Upload + GPU + Download;10;861.4
+200000;4;Upload + GPU + Download;11;881.4
+200000;4;Upload + GPU + Download;12;867.5
+200000;4;Upload + GPU + Download;13;892.4
+200000;4;Upload + GPU + Download;14;994
+200000;4;Upload + GPU + Download;15;940.6
+200000;4;Upload + GPU + Download;16;1058.7
+200000;4;Upload + GPU + Download;17;1050.4
+200000;4;Upload + GPU + Download;18;955.1
+200000;4;Upload + GPU + Download;19;930.1
+200000;8;GPU kernel only;0;23.7700007856
+200000;8;GPU kernel only;1;22.1599992365
+200000;8;GPU kernel only;2;21.6799993068
+200000;8;GPU kernel only;3;21.8000002205
+200000;8;GPU kernel only;4;21.1299993098
+200000;8;GPU kernel only;5;23.2100002468
+200000;8;GPU kernel only;6;24.070000276
+200000;8;GPU kernel only;7;21.8700002879
+200000;8;GPU kernel only;8;20.6300001591
+200000;8;GPU kernel only;9;22.3399996758
+200000;8;GPU kernel only;10;22.5000008941
+200000;8;GPU kernel only;11;27.1499995142
+200000;8;GPU kernel only;12;20.4700008035
+200000;8;GPU kernel only;13;22.1800003201
+200000;8;GPU kernel only;14;21.9999998808
+200000;8;GPU kernel only;15;5.10000018403
+200000;8;GPU kernel only;16;25.17000027
+200000;8;GPU kernel only;17;29.9299992621
+200000;8;GPU kernel only;18;0.699999975041
+200000;8;GPU kernel only;19;31.7899994552
+200000;8;GPU resident (host sync);0;42.8
+200000;8;GPU resident (host sync);1;46
+200000;8;GPU resident (host sync);2;44
+200000;8;GPU resident (host sync);3;43.7
+200000;8;GPU resident (host sync);4;41.1
+200000;8;GPU resident (host sync);5;47.1
+200000;8;GPU resident (host sync);6;44.3
+200000;8;GPU resident (host sync);7;42.1
+200000;8;GPU resident (host sync);8;42.9
+200000;8;GPU resident (host sync);9;46
+200000;8;GPU resident (host sync);10;42.9
+200000;8;GPU resident (host sync);11;42.8
+200000;8;GPU resident (host sync);12;43
+200000;8;GPU resident (host sync);13;45.5
+200000;8;GPU resident (host sync);14;43
+200000;8;GPU resident (host sync);15;42.5
+200000;8;GPU resident (host sync);16;42.5
+200000;8;GPU resident (host sync);17;46.6
+200000;8;GPU resident (host sync);18;42.1
+200000;8;GPU resident (host sync);19;42.5
+200000;8;Upload + GPU;0;599.8
+200000;8;Upload + GPU;1;426.1
+200000;8;Upload + GPU;2;433
+200000;8;Upload + GPU;3;414.4
+200000;8;Upload + GPU;4;526.2
+200000;8;Upload + GPU;5;453.2
+200000;8;Upload + GPU;6;455
+200000;8;Upload + GPU;7;467.1
+200000;8;Upload + GPU;8;497.6
+200000;8;Upload + GPU;9;422.5
+200000;8;Upload + GPU;10;489.1
+200000;8;Upload + GPU;11;436.8
+200000;8;Upload + GPU;12;445.3
+200000;8;Upload + GPU;13;429.9
+200000;8;Upload + GPU;14;414.1
+200000;8;Upload + GPU;15;482.3
+200000;8;Upload + GPU;16;458.7
+200000;8;Upload + GPU;17;471
+200000;8;Upload + GPU;18;591.2
+200000;8;Upload + GPU;19;479.7
+200000;8;Upload + GPU + Download;0;874.3
+200000;8;Upload + GPU + Download;1;917.2
+200000;8;Upload + GPU + Download;2;851.6
+200000;8;Upload + GPU + Download;3;848
+200000;8;Upload + GPU + Download;4;1054.5
+200000;8;Upload + GPU + Download;5;920.8
+200000;8;Upload + GPU + Download;6;1026.9
+200000;8;Upload + GPU + Download;7;1079.5
+200000;8;Upload + GPU + Download;8;937.1
+200000;8;Upload + GPU + Download;9;840.2
+200000;8;Upload + GPU + Download;10;1472.9
+200000;8;Upload + GPU + Download;11;907.6
+200000;8;Upload + GPU + Download;12;905.5
+200000;8;Upload + GPU + Download;13;838.6
+200000;8;Upload + GPU + Download;14;863.2
+200000;8;Upload + GPU + Download;15;999.3
+200000;8;Upload + GPU + Download;16;968
+200000;8;Upload + GPU + Download;17;953.6
+200000;8;Upload + GPU + Download;18;972.8
+200000;8;Upload + GPU + Download;19;873.8
+200000;16;GPU kernel only;0;20.640000701
+200000;16;GPU kernel only;1;22.6900000125
+200000;16;GPU kernel only;2;23.5200002789
+200000;16;GPU kernel only;3;23.1199990958
+200000;16;GPU kernel only;4;17.689999193
+200000;16;GPU kernel only;5;18.3400008827
+200000;16;GPU kernel only;6;26.4100003988
+200000;16;GPU kernel only;7;21.8700002879
+200000;16;GPU kernel only;8;21.0299994797
+200000;16;GPU kernel only;9;26.9699990749
+200000;16;GPU kernel only;10;22.3799999803
+200000;16;GPU kernel only;11;18.5800008476
+200000;16;GPU kernel only;12;2.51000002027
+200000;16;GPU kernel only;13;22.1500005573
+200000;16;GPU kernel only;14;23.180000484
+200000;16;GPU kernel only;15;21.2900005281
+200000;16;GPU kernel only;16;20.7899995148
+200000;16;GPU kernel only;17;24.9899998307
+200000;16;GPU kernel only;18;25.7600005716
+200000;16;GPU kernel only;19;24.0299999714
+200000;16;GPU resident (host sync);0;45.3
+200000;16;GPU resident (host sync);1;49.8
+200000;16;GPU resident (host sync);2;50.5
+200000;16;GPU resident (host sync);3;47.7
+200000;16;GPU resident (host sync);4;44.9
+200000;16;GPU resident (host sync);5;47.6
+200000;16;GPU resident (host sync);6;43.9
+200000;16;GPU resident (host sync);7;45.2
+200000;16;GPU resident (host sync);8;43.9
+200000;16;GPU resident (host sync);9;50.3
+200000;16;GPU resident (host sync);10;46.9
+200000;16;GPU resident (host sync);11;45.3
+200000;16;GPU resident (host sync);12;44.1
+200000;16;GPU resident (host sync);13;47.6
+200000;16;GPU resident (host sync);14;88.9
+200000;16;GPU resident (host sync);15;44.1
+200000;16;GPU resident (host sync);16;46.6
+200000;16;GPU resident (host sync);17;50.1
+200000;16;GPU resident (host sync);18;83.1
+200000;16;GPU resident (host sync);19;46.5
+200000;16;Upload + GPU;0;416.6
+200000;16;Upload + GPU;1;667.5
+200000;16;Upload + GPU;2;426.1
+200000;16;Upload + GPU;3;414.8
+200000;16;Upload + GPU;4;414.5
+200000;16;Upload + GPU;5;414.5
+200000;16;Upload + GPU;6;413.2
+200000;16;Upload + GPU;7;447.5
+200000;16;Upload + GPU;8;431.1
+200000;16;Upload + GPU;9;566.9
+200000;16;Upload + GPU;10;468.6
+200000;16;Upload + GPU;11;541.9
+200000;16;Upload + GPU;12;514.1
+200000;16;Upload + GPU;13;430.1
+200000;16;Upload + GPU;14;414.2
+200000;16;Upload + GPU;15;487.2
+200000;16;Upload + GPU;16;503.4
+200000;16;Upload + GPU;17;444.7
+200000;16;Upload + GPU;18;538.7
+200000;16;Upload + GPU;19;511.1
+200000;16;Upload + GPU + Download;0;1240.2
+200000;16;Upload + GPU + Download;1;924.2
+200000;16;Upload + GPU + Download;2;912.5
+200000;16;Upload + GPU + Download;3;997.2
+200000;16;Upload + GPU + Download;4;848.8
+200000;16;Upload + GPU + Download;5;1047.2
+200000;16;Upload + GPU + Download;6;870.3
+200000;16;Upload + GPU + Download;7;868.5
+200000;16;Upload + GPU + Download;8;1082.6
+200000;16;Upload + GPU + Download;9;1273
+200000;16;Upload + GPU + Download;10;974.7
+200000;16;Upload + GPU + Download;11;1259.1
+200000;16;Upload + GPU + Download;12;875.3
+200000;16;Upload + GPU + Download;13;893.6
+200000;16;Upload + GPU + Download;14;848.3
+200000;16;Upload + GPU + Download;15;851.5
+200000;16;Upload + GPU + Download;16;999.9
+200000;16;Upload + GPU + Download;17;941.3
+200000;16;Upload + GPU + Download;18;1059.7
+200000;16;Upload + GPU + Download;19;1062.9
+200000;32;GPU kernel only;0;15.9000009298
+200000;32;GPU kernel only;1;27.499999851
+200000;32;GPU kernel only;2;31.4199998975
+200000;32;GPU kernel only;3;27.2499993443
+200000;32;GPU kernel only;4;25.2000000328
+200000;32;GPU kernel only;5;28.8699995726
+200000;32;GPU kernel only;6;28.5000000149
+200000;32;GPU kernel only;7;26.6399998218
+200000;32;GPU kernel only;8;28.5899993032
+200000;32;GPU kernel only;9;26.610000059
+200000;32;GPU kernel only;10;27.270000428
+200000;32;GPU kernel only;11;16.4000000805
+200000;32;GPU kernel only;12;38.2100008428
+200000;32;GPU kernel only;13;28.0099995434
+200000;32;GPU kernel only;14;31.4900018275
+200000;32;GPU kernel only;15;27.6599992067
+200000;32;GPU kernel only;16;25.9799994528
+200000;32;GPU kernel only;17;27.270000428
+200000;32;GPU kernel only;18;27.4000000209
+200000;32;GPU kernel only;19;25.8799996227
+200000;32;GPU resident (host sync);0;48.7
+200000;32;GPU resident (host sync);1;52.6
+200000;32;GPU resident (host sync);2;48.8
+200000;32;GPU resident (host sync);3;47.6
+200000;32;GPU resident (host sync);4;46.8
+200000;32;GPU resident (host sync);5;52.1
+200000;32;GPU resident (host sync);6;55.5
+200000;32;GPU resident (host sync);7;48.2
+200000;32;GPU resident (host sync);8;48.9
+200000;32;GPU resident (host sync);9;51.7
+200000;32;GPU resident (host sync);10;47.4
+200000;32;GPU resident (host sync);11;48.5
+200000;32;GPU resident (host sync);12;48.1
+200000;32;GPU resident (host sync);13;64.6
+200000;32;GPU resident (host sync);14;49.4
+200000;32;GPU resident (host sync);15;50.1
+200000;32;GPU resident (host sync);16;50.9
+200000;32;GPU resident (host sync);17;55.6
+200000;32;GPU resident (host sync);18;48.1
+200000;32;GPU resident (host sync);19;48.2
+200000;32;Upload + GPU;0;458.4
+200000;32;Upload + GPU;1;924.6
+200000;32;Upload + GPU;2;486.3
+200000;32;Upload + GPU;3;497.9
+200000;32;Upload + GPU;4;476.3
+200000;32;Upload + GPU;5;474.4
+200000;32;Upload + GPU;6;565.4
+200000;32;Upload + GPU;7;529.7
+200000;32;Upload + GPU;8;581.7
+200000;32;Upload + GPU;9;562.9
+200000;32;Upload + GPU;10;569.8
+200000;32;Upload + GPU;11;502.2
+200000;32;Upload + GPU;12;489.6
+200000;32;Upload + GPU;13;459.1
+200000;32;Upload + GPU;14;516.7
+200000;32;Upload + GPU;15;522.2
+200000;32;Upload + GPU;16;490.4
+200000;32;Upload + GPU;17;546
+200000;32;Upload + GPU;18;504.7
+200000;32;Upload + GPU;19;429.8
+200000;32;Upload + GPU + Download;0;1015.2
+200000;32;Upload + GPU + Download;1;1199.5
+200000;32;Upload + GPU + Download;2;1088
+200000;32;Upload + GPU + Download;3;1008.8
+200000;32;Upload + GPU + Download;4;980.6
+200000;32;Upload + GPU + Download;5;1179.8
+200000;32;Upload + GPU + Download;6;1109
+200000;32;Upload + GPU + Download;7;1085.5
+200000;32;Upload + GPU + Download;8;1043.8
+200000;32;Upload + GPU + Download;9;915.5
+200000;32;Upload + GPU + Download;10;1321.6
+200000;32;Upload + GPU + Download;11;1114.2
+200000;32;Upload + GPU + Download;12;1002.4
+200000;32;Upload + GPU + Download;13;1003.9
+200000;32;Upload + GPU + Download;14;1017.6
+200000;32;Upload + GPU + Download;15;1222.3
+200000;32;Upload + GPU + Download;16;1127.6
+200000;32;Upload + GPU + Download;17;1164.7
+200000;32;Upload + GPU + Download;18;939.9
+200000;32;Upload + GPU + Download;19;935.5
+200000;64;GPU kernel only;0;30.3700007498
+200000;64;GPU kernel only;1;35.1600013673
+200000;64;GPU kernel only;2;34.7299985588
+200000;64;GPU kernel only;3;33.5300005972
+200000;64;GPU kernel only;4;35.6100015342
+200000;64;GPU kernel only;5;28.9699994028
+200000;64;GPU kernel only;6;33.8499993086
+200000;64;GPU kernel only;7;37.6899987459
+200000;64;GPU kernel only;8;29.7800004482
+200000;64;GPU kernel only;9;34.6399992704
+200000;64;GPU kernel only;10;33.56000036
+200000;64;GPU kernel only;11;33.5099995136
+200000;64;GPU kernel only;12;37.0899997652
+200000;64;GPU kernel only;13;34.469999373
+200000;64;GPU kernel only;14;36.5899987519
+200000;64;GPU kernel only;15;37.009999156
+200000;64;GPU kernel only;16;31.7200012505
+200000;64;GPU kernel only;17;34.0400002897
+200000;64;GPU kernel only;18;46.2099984288
+200000;64;GPU kernel only;19;15.180000104
+200000;64;GPU resident (host sync);0;119.9
+200000;64;GPU resident (host sync);1;58.9
+200000;64;GPU resident (host sync);2;57.9
+200000;64;GPU resident (host sync);3;53.8
+200000;64;GPU resident (host sync);4;54
+200000;64;GPU resident (host sync);5;60.8
+200000;64;GPU resident (host sync);6;55.6
+200000;64;GPU resident (host sync);7;57.9
+200000;64;GPU resident (host sync);8;55.8
+200000;64;GPU resident (host sync);9;59.2
+200000;64;GPU resident (host sync);10;56.9
+200000;64;GPU resident (host sync);11;55.1
+200000;64;GPU resident (host sync);12;55.9
+200000;64;GPU resident (host sync);13;59.7
+200000;64;GPU resident (host sync);14;56.8
+200000;64;GPU resident (host sync);15;57.3
+200000;64;GPU resident (host sync);16;56.2
+200000;64;GPU resident (host sync);17;78.1
+200000;64;GPU resident (host sync);18;58.5
+200000;64;GPU resident (host sync);19;58.1
+200000;64;Upload + GPU;0;703.5
+200000;64;Upload + GPU;1;476.2
+200000;64;Upload + GPU;2;507.7
+200000;64;Upload + GPU;3;453
+200000;64;Upload + GPU;4;539.9
+200000;64;Upload + GPU;5;504.5
+200000;64;Upload + GPU;6;466
+200000;64;Upload + GPU;7;535.2
+200000;64;Upload + GPU;8;518.5
+200000;64;Upload + GPU;9;473.6
+200000;64;Upload + GPU;10;706.2
+200000;64;Upload + GPU;11;512
+200000;64;Upload + GPU;12;516.1
+200000;64;Upload + GPU;13;478
+200000;64;Upload + GPU;14;542
+200000;64;Upload + GPU;15;543.9
+200000;64;Upload + GPU;16;549.8
+200000;64;Upload + GPU;17;551.1
+200000;64;Upload + GPU;18;534.7
+200000;64;Upload + GPU;19;590.2
+200000;64;Upload + GPU + Download;0;1193.9
+200000;64;Upload + GPU + Download;1;1006.6
+200000;64;Upload + GPU + Download;2;1033.3
+200000;64;Upload + GPU + Download;3;1057.5
+200000;64;Upload + GPU + Download;4;1055.9
+200000;64;Upload + GPU + Download;5;987.5
+200000;64;Upload + GPU + Download;6;987.1
+200000;64;Upload + GPU + Download;7;1246.5
+200000;64;Upload + GPU + Download;8;1050.8
+200000;64;Upload + GPU + Download;9;1234.9
+200000;64;Upload + GPU + Download;10;1052.8
+200000;64;Upload + GPU + Download;11;983.5
+200000;64;Upload + GPU + Download;12;1077.2
+200000;64;Upload + GPU + Download;13;976.8
+200000;64;Upload + GPU + Download;14;1147.3
+200000;64;Upload + GPU + Download;15;994.1
+200000;64;Upload + GPU + Download;16;1316
+200000;64;Upload + GPU + Download;17;1137.4
+200000;64;Upload + GPU + Download;18;1135.6
+200000;64;Upload + GPU + Download;19;1535.3
+200000;128;GPU kernel only;0;54.659999907
+200000;128;GPU kernel only;1;50.6200008094
+200000;128;GPU kernel only;2;46.3399998844
+200000;128;GPU kernel only;3;49.0499995649
+200000;128;GPU kernel only;4;55.4400011897
+200000;128;GPU kernel only;5;56.0100004077
+200000;128;GPU kernel only;6;75.8799985051
+200000;128;GPU kernel only;7;50.5400002003
+200000;128;GPU kernel only;8;51.3000003994
+200000;128;GPU kernel only;9;50.6599992514
+200000;128;GPU kernel only;10;52.6599995792
+200000;128;GPU kernel only;11;50.569999963
+200000;128;GPU kernel only;12;47.619998455
+200000;128;GPU kernel only;13;54.090000689
+200000;128;GPU kernel only;14;49.9200001359
+200000;128;GPU kernel only;15;47.5800000131
+200000;128;GPU kernel only;16;49.0299984813
+200000;128;GPU kernel only;17;49.7800000012
+200000;128;GPU kernel only;18;51.0400012136
+200000;128;GPU kernel only;19;46.9800010324
+200000;128;GPU resident (host sync);0;69.7
+200000;128;GPU resident (host sync);1;76.1
+200000;128;GPU resident (host sync);2;69.2
+200000;128;GPU resident (host sync);3;82.3
+200000;128;GPU resident (host sync);4;91.8
+200000;128;GPU resident (host sync);5;124.8
+200000;128;GPU resident (host sync);6;83.2
+200000;128;GPU resident (host sync);7;76.4
+200000;128;GPU resident (host sync);8;72
+200000;128;GPU resident (host sync);9;78.6
+200000;128;GPU resident (host sync);10;76.5
+200000;128;GPU resident (host sync);11;74.5
+200000;128;GPU resident (host sync);12;73.2
+200000;128;GPU resident (host sync);13;73.9
+200000;128;GPU resident (host sync);14;71.6
+200000;128;GPU resident (host sync);15;72.2
+200000;128;GPU resident (host sync);16;72
+200000;128;GPU resident (host sync);17;121.1
+200000;128;GPU resident (host sync);18;74.9
+200000;128;GPU resident (host sync);19;69.1
+200000;128;Upload + GPU;0;519.3
+200000;128;Upload + GPU;1;545.2
+200000;128;Upload + GPU;2;505.1
+200000;128;Upload + GPU;3;642
+200000;128;Upload + GPU;4;694
+200000;128;Upload + GPU;5;656.2
+200000;128;Upload + GPU;6;506.4
+200000;128;Upload + GPU;7;572.4
+200000;128;Upload + GPU;8;585.9
+200000;128;Upload + GPU;9;486.9
+200000;128;Upload + GPU;10;467.1
+200000;128;Upload + GPU;11;542.1
+200000;128;Upload + GPU;12;531.7
+200000;128;Upload + GPU;13;517.4
+200000;128;Upload + GPU;14;573.4
+200000;128;Upload + GPU;15;506
+200000;128;Upload + GPU;16;929.8
+200000;128;Upload + GPU;17;614.3
+200000;128;Upload + GPU;18;505.1
+200000;128;Upload + GPU;19;436
+200000;128;Upload + GPU + Download;0;1204.2
+200000;128;Upload + GPU + Download;1;1044.9
+200000;128;Upload + GPU + Download;2;1169.1
+200000;128;Upload + GPU + Download;3;1130.2
+200000;128;Upload + GPU + Download;4;1365.3
+200000;128;Upload + GPU + Download;5;1148.1
+200000;128;Upload + GPU + Download;6;1109.4
+200000;128;Upload + GPU + Download;7;1522.8
+200000;128;Upload + GPU + Download;8;1136.9
+200000;128;Upload + GPU + Download;9;931.9
+200000;128;Upload + GPU + Download;10;951.5
+200000;128;Upload + GPU + Download;11;1106.6
+200000;128;Upload + GPU + Download;12;1012.9
+200000;128;Upload + GPU + Download;13;1282.4
+200000;128;Upload + GPU + Download;14;1063.4
+200000;128;Upload + GPU + Download;15;980.6
+200000;128;Upload + GPU + Download;16;1512.9
+200000;128;Upload + GPU + Download;17;1034.2
+200000;128;Upload + GPU + Download;18;942.9
+200000;128;Upload + GPU + Download;19;878.8
+200000;256;GPU kernel only;0;80.3100019693
+200000;256;GPU kernel only;1;79.1999995708
+200000;256;GPU kernel only;2;77.3300006986
+200000;256;GPU kernel only;3;76.5099972486
+200000;256;GPU kernel only;4;70.9299966693
+200000;256;GPU kernel only;5;76.470002532
+200000;256;GPU kernel only;6;76.3100013137
+200000;256;GPU kernel only;7;76.8499970436
+200000;256;GPU kernel only;8;70.5799981952
+200000;256;GPU kernel only;9;73.5099986196
+200000;256;GPU kernel only;10;79.7900035977
+200000;256;GPU kernel only;11;96.7999994755
+200000;256;GPU kernel only;12;69.770000875
+200000;256;GPU kernel only;13;75.7300034165
+200000;256;GPU kernel only;14;76.6299962997
+200000;256;GPU kernel only;15;78.7699967623
+200000;256;GPU kernel only;16;69.7799995542
+200000;256;GPU kernel only;17;73.2899978757
+200000;256;GPU kernel only;18;75.6800025702
+200000;256;GPU kernel only;19;76.5900015831
+200000;256;GPU resident (host sync);0;99.6
+200000;256;GPU resident (host sync);1;99.3
+200000;256;GPU resident (host sync);2;101.5
+200000;256;GPU resident (host sync);3;95.3
+200000;256;GPU resident (host sync);4;95.7
+200000;256;GPU resident (host sync);5;161.7
+200000;256;GPU resident (host sync);6;93.5
+200000;256;GPU resident (host sync);7;95.4
+200000;256;GPU resident (host sync);8;94.2
+200000;256;GPU resident (host sync);9;99.2
+200000;256;GPU resident (host sync);10;97.1
+200000;256;GPU resident (host sync);11;100.9
+200000;256;GPU resident (host sync);12;91.9
+200000;256;GPU resident (host sync);13;95.8
+200000;256;GPU resident (host sync);14;92.6
+200000;256;GPU resident (host sync);15;113.5
+200000;256;GPU resident (host sync);16;97.8
+200000;256;GPU resident (host sync);17;94.7
+200000;256;GPU resident (host sync);18;95.3
+200000;256;GPU resident (host sync);19;99.6
+200000;256;Upload + GPU;0;619.6
+200000;256;Upload + GPU;1;500.9
+200000;256;Upload + GPU;2;568.8
+200000;256;Upload + GPU;3;477.1
+200000;256;Upload + GPU;4;489.1
+200000;256;Upload + GPU;5;731.8
+200000;256;Upload + GPU;6;478.7
+200000;256;Upload + GPU;7;481.1
+200000;256;Upload + GPU;8;471.2
+200000;256;Upload + GPU;9;557.8
+200000;256;Upload + GPU;10;512.2
+200000;256;Upload + GPU;11;566.7
+200000;256;Upload + GPU;12;501.6
+200000;256;Upload + GPU;13;471.8
+200000;256;Upload + GPU;14;857
+200000;256;Upload + GPU;15;489.1
+200000;256;Upload + GPU;16;530.9
+200000;256;Upload + GPU;17;493.6
+200000;256;Upload + GPU;18;517.5
+200000;256;Upload + GPU;19;468.5
+200000;256;Upload + GPU + Download;0;967.8
+200000;256;Upload + GPU + Download;1;1019.3
+200000;256;Upload + GPU + Download;2;982.9
+200000;256;Upload + GPU + Download;3;935.4
+200000;256;Upload + GPU + Download;4;1230.8
+200000;256;Upload + GPU + Download;5;993.9
+200000;256;Upload + GPU + Download;6;1023.3
+200000;256;Upload + GPU + Download;7;971.9
+200000;256;Upload + GPU + Download;8;1038
+200000;256;Upload + GPU + Download;9;1039.1
+200000;256;Upload + GPU + Download;10;951.3
+200000;256;Upload + GPU + Download;11;1081.4
+200000;256;Upload + GPU + Download;12;1015.7
+200000;256;Upload + GPU + Download;13;911.8
+200000;256;Upload + GPU + Download;14;1233.1
+200000;256;Upload + GPU + Download;15;929.4
+200000;256;Upload + GPU + Download;16;896.3
+200000;256;Upload + GPU + Download;17;906.5
+200000;256;Upload + GPU + Download;18;1161.1
+200000;256;Upload + GPU + Download;19;980
+200000;512;GPU kernel only;0;172.749996185
+200000;512;GPU kernel only;1;155.330002308
+200000;512;GPU kernel only;2;104.88999635
+200000;512;GPU kernel only;3;122.989997268
+200000;512;GPU kernel only;4;121.579997241
+200000;512;GPU kernel only;5;120.439998806
+200000;512;GPU kernel only;6;123.91000241
+200000;512;GPU kernel only;7;125.430002809
+200000;512;GPU kernel only;8;123.580001295
+200000;512;GPU kernel only;9;118.589997292
+200000;512;GPU kernel only;10;123.250000179
+200000;512;GPU kernel only;11;115.800000727
+200000;512;GPU kernel only;12;101.139999926
+200000;512;GPU kernel only;13;119.939997792
+200000;512;GPU kernel only;14;118.639998138
+200000;512;GPU kernel only;15;114.650003612
+200000;512;GPU kernel only;16;116.779997945
+200000;512;GPU kernel only;17;115.110002458
+200000;512;GPU kernel only;18;113.099999726
+200000;512;GPU kernel only;19;119.060002267
+200000;512;GPU resident (host sync);0;248.2
+200000;512;GPU resident (host sync);1;163.7
+200000;512;GPU resident (host sync);2;165.3
+200000;512;GPU resident (host sync);3;152.7
+200000;512;GPU resident (host sync);4;150.7
+200000;512;GPU resident (host sync);5;154.6
+200000;512;GPU resident (host sync);6;191.5
+200000;512;GPU resident (host sync);7;157.5
+200000;512;GPU resident (host sync);8;148.5
+200000;512;GPU resident (host sync);9;149.3
+200000;512;GPU resident (host sync);10;149.1
+200000;512;GPU resident (host sync);11;155.7
+200000;512;GPU resident (host sync);12;143.3
+200000;512;GPU resident (host sync);13;141.5
+200000;512;GPU resident (host sync);14;144
+200000;512;GPU resident (host sync);15;143.8
+200000;512;GPU resident (host sync);16;141.7
+200000;512;GPU resident (host sync);17;149.3
+200000;512;GPU resident (host sync);18;142.1
+200000;512;GPU resident (host sync);19;140.9
+200000;512;Upload + GPU;0;567.6
+200000;512;Upload + GPU;1;547
+200000;512;Upload + GPU;2;949.1
+200000;512;Upload + GPU;3;558.7
+200000;512;Upload + GPU;4;546.5
+200000;512;Upload + GPU;5;560.7
+200000;512;Upload + GPU;6;565.1
+200000;512;Upload + GPU;7;559.4
+200000;512;Upload + GPU;8;758.2
+200000;512;Upload + GPU;9;539.3
+200000;512;Upload + GPU;10;520.4
+200000;512;Upload + GPU;11;523.5
+200000;512;Upload + GPU;12;659
+200000;512;Upload + GPU;13;516.9
+200000;512;Upload + GPU;14;506.1
+200000;512;Upload + GPU;15;542.8
+200000;512;Upload + GPU;16;572.3
+200000;512;Upload + GPU;17;549.1
+200000;512;Upload + GPU;18;544.3
+200000;512;Upload + GPU;19;529.8
+200000;512;Upload + GPU + Download;0;1066.4
+200000;512;Upload + GPU + Download;1;1056.6
+200000;512;Upload + GPU + Download;2;1264
+200000;512;Upload + GPU + Download;3;978.3
+200000;512;Upload + GPU + Download;4;962.2
+200000;512;Upload + GPU + Download;5;980.3
+200000;512;Upload + GPU + Download;6;1156.9
+200000;512;Upload + GPU + Download;7;1048.9
+200000;512;Upload + GPU + Download;8;995.1
+200000;512;Upload + GPU + Download;9;1030.4
+200000;512;Upload + GPU + Download;10;1400.4
+200000;512;Upload + GPU + Download;11;953.8
+200000;512;Upload + GPU + Download;12;1029.1
+200000;512;Upload + GPU + Download;13;939.6
+200000;512;Upload + GPU + Download;14;1085.8
+200000;512;Upload + GPU + Download;15;1041.7
+200000;512;Upload + GPU + Download;16;1073.9
+200000;512;Upload + GPU + Download;17;972.1
+200000;512;Upload + GPU + Download;18;948.9
+200000;512;Upload + GPU + Download;19;1606.2
+200000;1024;GPU kernel only;0;229.509994388
+200000;1024;GPU kernel only;1;252.889990807
+200000;1024;GPU kernel only;2;332.399994135
+200000;1024;GPU kernel only;3;228.239998221
+200000;1024;GPU kernel only;4;252.97999382
+200000;1024;GPU kernel only;5;237.65000701
+200000;1024;GPU kernel only;6;242.53000319
+200000;1024;GPU kernel only;7;236.239999533
+200000;1024;GPU kernel only;8;265.119999647
+200000;1024;GPU kernel only;9;240.799993277
+200000;1024;GPU kernel only;10;239.800006151
+200000;1024;GPU kernel only;11;269.699990749
+200000;1024;GPU kernel only;12;228.619992733
+200000;1024;GPU kernel only;13;244.470000267
+200000;1024;GPU kernel only;14;239.769995213
+200000;1024;GPU kernel only;15;249.219998717
+200000;1024;GPU kernel only;16;242.329999804
+200000;1024;GPU kernel only;17;287.62999177
+200000;1024;GPU kernel only;18;249.080002308
+200000;1024;GPU kernel only;19;265.249997377
+200000;1024;GPU resident (host sync);0;206.5
+200000;1024;GPU resident (host sync);1;265.6
+200000;1024;GPU resident (host sync);2;285.6
+200000;1024;GPU resident (host sync);3;289.8
+200000;1024;GPU resident (host sync);4;268.2
+200000;1024;GPU resident (host sync);5;297
+200000;1024;GPU resident (host sync);6;284.7
+200000;1024;GPU resident (host sync);7;260.5
+200000;1024;GPU resident (host sync);8;300.4
+200000;1024;GPU resident (host sync);9;334.1
+200000;1024;GPU resident (host sync);10;266.2
+200000;1024;GPU resident (host sync);11;289
+200000;1024;GPU resident (host sync);12;276.8
+200000;1024;GPU resident (host sync);13;275.7
+200000;1024;GPU resident (host sync);14;267.8
+200000;1024;GPU resident (host sync);15;280.4
+200000;1024;GPU resident (host sync);16;333.7
+200000;1024;GPU resident (host sync);17;277.1
+200000;1024;GPU resident (host sync);18;270.7
+200000;1024;GPU resident (host sync);19;284
+200000;1024;Upload + GPU;0;676.9
+200000;1024;Upload + GPU;1;858.9
+200000;1024;Upload + GPU;2;737.2
+200000;1024;Upload + GPU;3;702.4
+200000;1024;Upload + GPU;4;796.8
+200000;1024;Upload + GPU;5;718.1
+200000;1024;Upload + GPU;6;650.8
+200000;1024;Upload + GPU;7;738.6
+200000;1024;Upload + GPU;8;858.7
+200000;1024;Upload + GPU;9;929.8
+200000;1024;Upload + GPU;10;711.6
+200000;1024;Upload + GPU;11;706.6
+200000;1024;Upload + GPU;12;689.6
+200000;1024;Upload + GPU;13;783.1
+200000;1024;Upload + GPU;14;640.3
+200000;1024;Upload + GPU;15;812
+200000;1024;Upload + GPU;16;701
+200000;1024;Upload + GPU;17;1047.8
+200000;1024;Upload + GPU;18;706.8
+200000;1024;Upload + GPU;19;764.5
+200000;1024;Upload + GPU + Download;0;1067.7
+200000;1024;Upload + GPU + Download;1;1395.5
+200000;1024;Upload + GPU + Download;2;1517.2
+200000;1024;Upload + GPU + Download;3;1414.4
+200000;1024;Upload + GPU + Download;4;1485.7
+200000;1024;Upload + GPU + Download;5;1139.5
+200000;1024;Upload + GPU + Download;6;1282.7
+200000;1024;Upload + GPU + Download;7;1134
+200000;1024;Upload + GPU + Download;8;1651.2
+200000;1024;Upload + GPU + Download;9;1373.2
+200000;1024;Upload + GPU + Download;10;1528.4
+200000;1024;Upload + GPU + Download;11;1236.9
+200000;1024;Upload + GPU + Download;12;1165.9
+200000;1024;Upload + GPU + Download;13;1292.9
+200000;1024;Upload + GPU + Download;14;1119.5
+200000;1024;Upload + GPU + Download;15;1188.9
+200000;1024;Upload + GPU + Download;16;1187.4
+200000;1024;Upload + GPU + Download;17;1382.5
+200000;1024;Upload + GPU + Download;18;1223.4
+200000;1024;Upload + GPU + Download;19;1163.3

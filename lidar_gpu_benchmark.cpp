@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -415,6 +417,112 @@ static void create_histograms(
     }
 }
 
+
+struct HistogramPeakResult {
+    double center_us{};
+    std::size_t count{};
+};
+
+static HistogramPeakResult histogram_peak_result(
+    const std::vector<double>& samples,
+    int bins = 60)
+{
+    if (samples.empty()) {
+        return {};
+    }
+
+    const auto [min_it, max_it] =
+        std::minmax_element(samples.begin(), samples.end());
+
+    double min_v = *min_it;
+    double max_v = *max_it;
+
+    if (max_v <= min_v) {
+        max_v = min_v + 1.0;
+    }
+
+    const double width =
+        (max_v - min_v) / static_cast<double>(bins);
+
+    std::vector<std::size_t> counts(
+        static_cast<std::size_t>(bins), 0);
+
+    for (double v : samples) {
+        int bin = static_cast<int>((v - min_v) / width);
+        bin = std::clamp(bin, 0, bins - 1);
+        counts[static_cast<std::size_t>(bin)]++;
+    }
+
+    const auto peak_it =
+        std::max_element(counts.begin(), counts.end());
+
+    const std::size_t peak_index =
+        static_cast<std::size_t>(
+            std::distance(counts.begin(), peak_it));
+
+    return {
+        min_v + (static_cast<double>(peak_index) + 0.5) * width,
+        *peak_it
+    };
+}
+
+static void write_gpu_results_txt(
+    const std::vector<std::size_t>& point_counts,
+    const std::vector<Timing>& results)
+{
+    const std::filesystem::path result_dir =
+        std::filesystem::current_path() / "result";
+
+    std::filesystem::create_directories(result_dir);
+
+    const std::filesystem::path path =
+        result_dir / "gpu_results.txt";
+
+    std::ofstream out(path, std::ios::trunc);
+    if (!out) {
+        throw std::runtime_error("GPU-Ergebnisdatei konnte nicht geoeffnet werden.");
+    }
+
+    out << "\n### GPU RESULTS ###\n";
+    out << "Peak = Mittelpunkt des Histogramm-Bins mit den meisten Messungen\n";
+    out << "points;method;peak_us;peak_count;samples;invalid_samples\n";
+
+    for (std::size_t i = 0; i < point_counts.size(); ++i) {
+        const auto kernel_peak =
+            histogram_peak_result(results[i].kernel_samples, 60);
+
+        const auto upload_peak =
+            histogram_peak_result(results[i].h2d_kernel_samples, 60);
+
+        const auto roundtrip_peak =
+            histogram_peak_result(results[i].roundtrip_samples, 60);
+
+        out << point_counts[i]
+            << ";GPU kernel only;"
+            << std::fixed << std::setprecision(3)
+            << kernel_peak.center_us << ";"
+            << kernel_peak.count << ";"
+            << results[i].kernel_samples.size() << ";"
+            << results[i].invalid_kernel_samples << "\n";
+
+        out << point_counts[i]
+            << ";PCIe upload + GPU kernel;"
+            << upload_peak.center_us << ";"
+            << upload_peak.count << ";"
+            << results[i].h2d_kernel_samples.size() << ";0\n";
+
+        out << point_counts[i]
+            << ";PCIe upload + GPU kernel + PCIe download;"
+            << roundtrip_peak.center_us << ";"
+            << roundtrip_peak.count << ";"
+            << results[i].roundtrip_samples.size() << ";0\n";
+    }
+
+    std::cout << "GPU-Ergebnisse gespeichert: "
+              << path << "\n";
+}
+
+
 int main(int argc, char** argv)
 {
     int rounds = 200;
@@ -464,15 +572,13 @@ int main(int argc, char** argv)
         800'000,
         1'600'000,
         3'200'000,
-        6'400'000
+        6'400'000,
+        12'800'000,
+        25'600'000
     };
 
     std::vector<Timing> all_results;
     all_results.reserve(point_counts.size());
-
-    std::ofstream csv("gpu_benchmark.csv", std::ios::trunc);
-    csv << "points,kernel_us,h2d_kernel_us,roundtrip_us,"
-           "kernel_gpoints_s,h2d_kernel_gpoints_s,roundtrip_gpoints_s\n";
 
     std::cout << std::fixed << std::setprecision(2);
 
@@ -508,20 +614,10 @@ int main(int argc, char** argv)
             << std::setw(10) << t.roundtrip_us << " us  | "
             << roundtrip_gpps << " Gpoints/s\n\n";
 
-        csv
-            << count << ","
-            << t.kernel_us << ","
-            << t.h2d_kernel_us << ","
-            << t.roundtrip_us << ","
-            << kernel_gpps << ","
-            << h2d_gpps << ","
-            << roundtrip_gpps << "\n";
-
         all_results.push_back(std::move(t));
     }
 
-    csv.close();
-    std::cout << "CSV gespeichert: .\\gpu_benchmark.csv\n";
+    write_gpu_results_txt(point_counts, all_results);
 
     create_histograms(point_counts, all_results);
 
