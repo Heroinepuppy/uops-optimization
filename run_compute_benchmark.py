@@ -1,3 +1,4 @@
+import os
 """Sweep cloud size and chained transforms; compare CPU with GPU end-to-end latency."""
 import argparse
 import csv
@@ -8,8 +9,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
-ROOT = Path(__file__).resolve().parent
-SIZES = [200000 * 2**i for i in range(8)]
+ROOT = Path(".")
+SIZES = [10000, 25000, 50000, 100000] + [200000 * 2**i for i in range(8)]
 METHODS = {
     "CPU 4T / 4 CCX": "#D55E00",
     "GPU kernel only": "#56B4E9",
@@ -21,12 +22,26 @@ METHODS = {
 def quote(value):
     return '"' + str(value).replace('\\', '/').replace('"', '\\"') + '"'
 
+def result_file(directory, size, device, kind='results'):
+    flat = directory / f'compute_{device}_{size}_{kind}.csv'
+    legacy = directory / str(size) / f'compute_{device}_{kind}.csv'
+    return flat if flat.exists() or not legacy.exists() else legacy
+
+
+def discover_sizes(directory):
+    sizes = {int(p.name) for p in directory.iterdir() if p.is_dir() and p.name.isdigit()}
+    for path in directory.glob('compute_cpu_*_results.csv'):
+        token = path.name.removeprefix('compute_cpu_').removesuffix('_results.csv')
+        if token.isdigit(): sizes.add(int(token))
+    return sorted(n for n in sizes if all(result_file(directory,n,d).exists() for d in ('cpu','gpu')))
+
+
 def load(directory, sizes):
     values = {}
     counts_by_size = {}
     for size in sizes:
         for device in ('cpu', 'gpu'):
-            path = directory / str(size) / f'compute_{device}_results.csv'
+            path = result_file(directory,size,device)
             with path.open(encoding='utf-8') as source:
                 for row in csv.DictReader(source, delimiter=';'):
                     if int(row['points']) != size:
@@ -47,6 +62,8 @@ def load(directory, sizes):
     return values, counts_by_size
 
 def plot(directory, sizes):
+    pictures = ROOT / "results" / "pics"
+    pictures.mkdir(parents=True, exist_ok=True)
     values, counts_by_size = load(directory, sizes)
     crossings = []
     for size in sizes:
@@ -70,7 +87,7 @@ def plot(directory, sizes):
         writer.writeheader(); writer.writerows(crossings)
     columns = min(3, len(sizes)); rows = math.ceil(len(sizes)/columns)
     commands = ['reset', f"set terminal pngcairo size {columns*900},{rows*600} enhanced font 'Segoe UI,10'",
-                f'set output {quote(directory / "compute_comparison.png")}',
+                f'set output {quote(pictures / "compute_comparison.png")}',
                 "set datafile separator ';'", 'set origin 0,0', 'set size 1,1',
                 f"set multiplot layout {rows},{columns} rowsfirst title 'CPU / GPU - Transformationsketten (Median pro Cloud)' font ',16'",
                 "set xlabel 'Transformationen pro Punkt (log2)'", "set ylabel 'Laufzeit pro Cloud [us]'",
@@ -94,7 +111,7 @@ def plot(directory, sizes):
                                       for col,(method,color) in enumerate(METHODS.items(),2)
                                       if method in ('CPU 4T / 4 CCX', 'Upload + GPU + Download'))]
     commands += ['unset multiplot', 'unset output']
-    commands += [f'set output {quote(directory / "compute_speedup.png")}',
+    commands += [f'set output {quote(pictures / "compute_speedup.png")}',
                  'set origin 0,0', 'set size 1,1',
                  f"set multiplot layout {rows},{columns} rowsfirst title 'GPU-Vorteil inklusive Upload und Download (CPU / GPU)' font ',16'",
                  "set ylabel 'CPU-Zeit / GPU-Roundtrip-Zeit'", "set key top left font ',9'"]
@@ -114,7 +131,8 @@ def plot(directory, sizes):
                      "1 with lines dt 2 lc rgb '#777777' title 'Gleich schnell'"]
     commands += ['unset multiplot', 'unset output']
     colors = ['#0072B2', '#E69F00', '#009E73', '#CC79A7',
-              '#D55E00', '#56B4E9', '#7B3294', '#333333']
+              '#D55E00', '#56B4E9', '#7B3294', '#333333',
+              '#A6761D', '#E7298A', '#66A61E', '#1B9E77']
     all_counts = sorted({k for counts in counts_by_size.values() for k in counts})
     upper = max(values[size,k,method] for size in sizes for k in counts_by_size[size]
                 for method in ('CPU 4T / 4 CCX', 'Upload + GPU + Download')) * 1.1
@@ -124,7 +142,7 @@ def plot(directory, sizes):
     upper = math.ceil(upper/step)*step
     xticks = all_counts[::max(1,math.ceil(len(all_counts)/10))]
     commands += ["set terminal pngcairo size 2000,1200 enhanced font 'Segoe UI,12'",
-                 f'set output {quote(directory / "compute_combined.png")}',
+                 f'set output {quote(pictures / "compute_combined.png")}',
                  'set origin 0,0', 'set size 1,1',
                  "set title 'CPU / GPU - alle Punktwolken-Groessen' font ',18'",
                  "set ylabel 'Laufzeit pro Cloud [us]'",
@@ -176,7 +194,7 @@ def plot(directory, sizes):
             commands += ['set object 1 polygon from '
                          + ' to '.join(f'{k},{time}' for k,time in polygon)
                          + ' behind fillcolor rgb "#FF0000" fillstyle transparent solid 0.25 noborder']
-        commands += [f'set output {quote(directory / "compute_combined_gpu_zoom.png")}',
+        commands += [f'set output {quote(pictures / "compute_combined_gpu_zoom.png")}',
                      "set title 'CPU / GPU - Ausschnitt bis 1.1 x GPU-Maximum (25.6 Mio. Punkte)' font ',18'",
                      f'set yrange [0:{gpu_upper}]', f'set ytics 0,{step},{gpu_upper}',
                      'replot' + (' ' + ', '.join(boundary_plots) if boundary_plots else ''),
@@ -187,19 +205,23 @@ def plot(directory, sizes):
     executable = shutil.which('gnuplot')
     if not executable: raise ValueError('Gnuplot fehlt im PATH')
     subprocess.run([executable, str(script)], check=True)
-    print(f'Plot: {directory / "compute_comparison.png"}', flush=True)
+    print(f'Plot: {pictures / "compute_comparison.png"}', flush=True)
 
 def main():
+    os.chdir(Path(__file__).resolve().parent)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--points', nargs='+', type=int, default=SIZES)
+    parser.add_argument('--points', nargs='+', type=int)
     parser.add_argument('--rounds', type=int, default=20)
     parser.add_argument('--max-transforms', type=int, default=1024)
-    parser.add_argument('--output-dir', type=Path, default=ROOT/'result'/'compute')
+    parser.add_argument('--output-dir', type=Path, default=ROOT/'results'/'data')
     parser.add_argument('--plot-only', action='store_true')
     args = parser.parse_args()
+    directory=Path(os.path.relpath(args.output_dir))
+    if args.points is None:
+        args.points = discover_sizes(directory) if args.plot_only and directory.exists() else SIZES
     if not args.points or min(args.points)<=0 or args.rounds<=0 or not 1<=args.max_transforms<=65536:
         parser.error('Punktzahlen und Runden muessen positiv sein; Transformationen 1..65536')
-    sizes = sorted(set(args.points)); directory=args.output_dir.resolve()
+    sizes = sorted(set(args.points)); directory=Path(os.path.relpath(args.output_dir))
     directory.mkdir(parents=True, exist_ok=True)
     if not args.plot_only:
         cpu=ROOT/'build'/'vs2026'/'Release'/'lidar_compute_cpu.exe'
@@ -218,7 +240,7 @@ def main():
                 print(f'\n{size} Punkte - {executable.name}', flush=True)
                 subprocess.run([str(executable), '--points', str(size), '--rounds', str(args.rounds),
                                 '--max-transforms', str(args.max_transforms),
-                                '--output-dir', str(directory/str(size))], cwd=ROOT, check=True)
+                                '--output-dir', str(directory)], cwd=ROOT, check=True)
     plot(directory,sizes)
 
 if __name__=='__main__':

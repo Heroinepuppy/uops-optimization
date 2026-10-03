@@ -52,7 +52,7 @@ int main(int argc, char** argv) try {
     SoA s(o.points); compute_fill(s.x,s.y,s.z);
     ComputeTeam team(s,t,selection.four_ccx_cpus);
     std::vector<ComputeResult> results;
-    for (unsigned k:compute_counts(o.max_transforms)) {
+    for (unsigned k:compute_counts(o)) {
         team.run(k);
         compute_verify(s.x,s.y,s.z,s.ox,s.oy,s.oz,t,k);
         if(o.verify_only) continue;

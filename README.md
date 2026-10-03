@@ -521,8 +521,8 @@ gespeichert.
 Dateien:
 
 ```text
-.\result\uop_benchmark.png
-.\result\thread_scaling.png
+.\results\pics\uop_benchmark.png
+.\results\pics\thread_scaling.png
 ```
 
 Der Ordner wird automatisch erzeugt.
@@ -678,8 +678,8 @@ drei Pfade:
 Die Resultate werden nach
 
 ```text
-result\gpu_results.txt
-result\gpu_benchmark.png
+results\data\gpu_results.txt
+results\pics\gpu_benchmark.png
 ```
 
 geschrieben.
@@ -725,8 +725,8 @@ Both benchmarks calculate the **highest histogram peak** (the center of the
 60-bin histogram bucket containing the most samples) and write it to:
 
 ```text
-result\cpu_results.txt
-result\gpu_results.txt
+results\data\cpu_results.txt
+results\data\gpu_results.txt
 ```
 
 CPU and GPU write separate files. Each benchmark replaces its previous results
@@ -745,7 +745,7 @@ Requires Python 3 and Gnuplot in PATH; no Python packages are required.
 The script writes:
 
 ```text
-result\cpu_gpu_comparison.png
+results\pics\cpu_gpu_comparison.png
 ```
 
 The single grouped bar plot compares all measured CPU configurations and all
@@ -873,13 +873,13 @@ Standard: 20 Messrunden je Kombination; der komplette Sweep kann mehrere Minuten
 # Schneller Durchlauf ueber alle acht Punktzahlen:
 python .\run_compute_benchmark.py --rounds 5 --max-transforms 128
 # Einzelne Punktzahl, hoehere Transformationszahlen:
-python .\run_compute_benchmark.py --points 200000 --max-transforms 4096 --output-dir result/compute_extra
+python .\run_compute_benchmark.py --points 200000 --max-transforms 4096 --output-dir results/data
 # Nur gespeicherte Ergebnisse neu plotten:
 python .\run_compute_benchmark.py --plot-only
 ```
 
-Ausgabe: `result/compute/<Punktzahl>/compute_{cpu,gpu}_{results,samples}.csv`,
-`result/compute/compute_comparison.{gp,png}`, `compute_speedup.png` und
+Ausgabe: `results/data/compute_{cpu,gpu}_<Punktzahl>_{results,samples}.csv`,
+`results/pics/compute_comparison.png`, `compute_speedup.png` und
 `compute_crossover.csv`. Der Speedup-Plot zeigt CPU-Zeit geteilt durch
 GPU-Roundtrip-Zeit; Werte ueber 1 bedeuten einen GPU-Vorteil.
 Die Vergleichsgrafik zeigt einen Subplot pro Punktzahl, lineare Y-Achsen mit
@@ -892,3 +892,111 @@ ab welchem Messwert die GPU bei allen nachfolgenden getesteten Werten vorne
 liegt. Das sind diskrete Messpunkte, keine interpolierte exakte Schwelle und
 keine Aussage ueber statistische Signifikanz. Kleine Differenzen sollten mit
 mehr Messrunden und dichterer Abstufung nachgemessen werden.
+
+
+### Umschlagintervalle mit bis zu 50 Zwischenwerten verfeinern
+
+`refine_compute_crossover.py` liest die CPU- und GPU-Medianwerte aus dem
+vorhandenen Sweep und sucht pro Punktzahl den ersten GPU-Roundtrip-Vorteil
+sowie den letzten vorherigen CPU-Vorteil. Dazwischen werden standardmaessig bis zu 50 gleichmaessig
+verteilte ganzzahlige Transformationszahlen ausgewaehlt. Bei schmalen
+Intervallen werden alle verfuegbaren ganzen Zahlen ohne Duplikate getestet.
+Beide alten Randpunkte werden ebenfalls erneut gemessen (bis zu 52 Werte insgesamt), standardmaessig mit jeweils 30 Messrunden.
+
+```powershell
+# Nur den automatisch erkannten Messplan anzeigen:
+python .\refine_compute_crossover.py --plan-only
+# Nach Neubau der beiden Compute-Executables messen und plotten:
+python .\refine_compute_crossover.py
+```
+
+VS-Code-Task: **Compute: Refine crossover** (inklusive Builds).
+Die beiden Executables akzeptieren dafuer `--transforms 16,17,19,20,22,23`;
+die explizite Liste ersetzt den Potenz-von-zwei-Sweep.
+
+Ausgaben liegen fest in `results/data/` und `results/pics/` und werden beim
+naechsten Lauf ueberschrieben. `refinement_plan.json` dokumentiert Quelle, Intervalle und
+Messparameter; `refined_crossover.csv` zeigt alte und neue Grenzen sowie
+mehrfache Gewinnerwechsel. Ist ein alter Randpunkt bei der Wiederholung
+bereits auf der anderen Seite, wird das ausdruecklich gemeldet; es wird keine
+Grenze aus alten und neuen Messungen zusammengesetzt. Diese Intervalle sind
+Messbefunde und keine statistischen Konfidenzintervalle.
+
+Mit `--source-dir <Ergebnisordner>` lassen sich auch verfeinerte Ergebnisse
+als Ausgangspunkt verwenden. `--output-dir <Ergebnisordner>` legt das
+Ziel fest. `--plot-only --output-dir <bestehender-Ergebnisordner>` aktualisiert
+nur die Auswertung/Grafiken aus dem dort gespeicherten Messplan.
+
+
+### Exponentialfit der Umschlagkurve
+
+```powershell
+python .\fit_compute_crossover.py
+```
+
+Pro Punktzahl wird die Mitte des ersten gemessenen Umschlagintervalls verwendet.
+Die Y-Koordinate ist die linear zwischen den beiden CPU-Messwerten interpolierte
+Laufzeit. Faelle ohne beidseitige Grenze werden ausgeschlossen und im Bericht
+aufgelistet. Das Modell lautet `y = a * exp(-b * (x-x0)) + c`, mit x als
+Transformationszahl und y in Mikrosekunden. x0 ist die kleinste verwendete
+Intervallmitte und wird nicht angepasst.
+
+Verglichen werden c=0 und freier Offset c. Fuer jede Abklingrate b werden a und c
+linear nach kleinsten Fehlerquadraten bestimmt; b wird logarithmisch im Bereich
+1e-6 bis 10 gesucht und lokale Minima werden verfeinert. Das ausgegebene beste
+Modell minimiert die ungewichtete Fehlerquadratsumme in Mikrosekunden, nicht im
+Logarithmus. Der freie Offset hat einen Parameter mehr; eine kleinere
+Trainingsabweichung beweist keine bessere Vorhersage ausserhalb der Messdaten.
+
+Parameter, RMSE, R-Quadrat und Eingabepunkte stehen in
+`crossover_exponential_fit.json`; der separate Plot heisst
+`crossover_exponential_fit.png`. Die horizontalen Balken zeigen gemessene
+Intervalle, keine statistischen Konfidenzintervalle. Bei mehrfachen
+Gewinnerwechseln ist die erste Grenze entsprechend unsicher.
+
+
+### Zusaetzliche kleine Punktwolken
+
+Der Compute-Sweep umfasst jetzt standardmaessig auch 10.000, 25.000, 50.000
+und 100.000 Punkte. Nur diese vier Groessen lassen sich so untersuchen:
+
+```powershell
+python run_compute_benchmark.py --points 10000 25000 50000 100000 --rounds 30
+python refine_compute_crossover.py --steps 50 --rounds 30
+```
+
+Das Zusammenfuehren kopiert die disjunkten Messreihen und dokumentiert ihre
+Herkunft. Es ersetzt keine alten Messdaten. Der Gesamtvergleich kombiniert
+verschiedene Messsitzungen und kann daher auch Unterschiede der Hintergrundlast
+enthalten. `--plot-only` des Sweep-Skripts erkennt ohne `--points` automatisch
+die im angegebenen Ordner vorhandenen Punktzahlen.
+
+Der Exponentialfit erweitert seine Suchobergrenze fuer die Abklingrate bei
+kleinen X-Abstaenden automatisch auf mindestens `30 / kleinster X-Abstand`.
+Damit wird eine steile Kurve bei kleinen Punktwolken nicht durch die alte
+Suchgrenze von 10 pro Million Punkten kuenstlich begrenzt.
+
+
+### Alles reproduzieren
+
+```powershell
+python .\run_all_benchmarks.py
+```
+
+Baut alle CPU- und GPU-Programme und fuehrt sie nacheinander aus: Uop-Test,
+Thread-Skalierung, GPU-Test, CPU/GPU-Vergleich, Transformations-Sweep von
+10.000 bis 25.600.000 Punkten, Verfeinerung mit bis zu 50 Zwischenwerten
+und beide Exponentialfit-Plots. Vorhandene Ergebnisse sind nicht erforderlich;
+der alte Ordner `result/` kann geloescht werden.
+
+Alle Bilder liegen in `results/pics/`, alle CSV-Dateien, Fit-Parameter,
+Gnuplot-Skripte und Protokolle in `results/data/`. Feste Dateinamen werden
+bei jedem Lauf ueberschrieben; es entstehen keine Zeitstempelordner.
+`coarse_*.csv` bewahrt den vollstaendigen Sweep vor der Verfeinerung.
+`pipeline_status.json` nennt den aktuellen Schritt bzw. einen fehlgeschlagenen
+Schritt, `pipeline_XX.log` enthaelt dessen Ausgabe. Im Gesamtlauf werden
+keine interaktiven Plotfenster geoeffnet.
+
+Voraussetzungen auf diesem System: Python, Gnuplot im PATH, Visual Studio
+2026 Community mit C++ und CMake, MSVC 14.44 sowie ROCm 7.2 (GPU gfx1100).
+`python run_all_benchmarks.py --dry-run` zeigt nur die Befehle.

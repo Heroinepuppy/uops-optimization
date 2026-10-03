@@ -52,7 +52,7 @@ int main(int argc,char** argv) try {
     Events events; HIP_CHECK(hipEventCreate(&events.start)); HIP_CHECK(hipEventCreate(&events.stop));
     upload();
     std::vector<ComputeResult> results;
-    for(unsigned k:compute_counts(o.max_transforms)) {
+    for(unsigned k:compute_counts(o)) {
         launch(k); download(); HIP_CHECK(hipDeviceSynchronize());
         compute_verify(x,y,z,ox,oy,oz,t,k,o.verify_only);
         if(o.verify_only) continue;

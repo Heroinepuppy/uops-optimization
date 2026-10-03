@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include "lidar_cpu_core.h"
 
 class ParallelTeam {
@@ -445,14 +446,14 @@ static void print_results(const std::array<CaseResult, 5>& results) {
 
 static void plot_threading(const std::vector<CaseResult>& all) {
     const std::filesystem::path result_dir =
-        std::filesystem::current_path() / "result";
+        std::filesystem::path("results") / "data";
     std::filesystem::create_directories(result_dir);
+    std::filesystem::create_directories(result_dir.parent_path() / "pics");
 
     const std::filesystem::path png_path =
-        result_dir / "thread_scaling.png";
+        result_dir.parent_path() / "pics" / "thread_scaling.png";
     const std::filesystem::path script =
-        std::filesystem::temp_directory_path() /
-        "lidar_thread_scaling.gp";
+        result_dir / "thread_scaling.gp";
 
     std::ofstream gp(script, std::ios::trunc);
     if (!gp) {
@@ -541,9 +542,11 @@ static void plot_threading(const std::vector<CaseResult>& all) {
     gp << "unset output\n\n";
 
     // Keep the interactive Gnuplot window too.
+    if (!std::getenv("LIDAR_BATCH")) {
     gp << "set term qt size 1900,1200 enhanced font 'Segoe UI,8'\n";
     emit_layout();
 
+    }
     gp.close();
 
     std::cout << "PNG gespeichert: " << png_path << "\n";
@@ -556,7 +559,7 @@ static void plot_threading(const std::vector<CaseResult>& all) {
 
 static void write_cpu_results(const std::vector<CaseResult>& all) {
     const std::filesystem::path path =
-        std::filesystem::current_path() / "result" / "cpu_results.txt";
+        std::filesystem::path("results") / "data" / "cpu_results.txt";
 
     std::ostringstream body;
     body << "Histogram bins: 60\n";

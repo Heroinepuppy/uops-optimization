@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -16,8 +17,9 @@ struct ComputeOptions {
     std::size_t points = 200000;
     unsigned rounds = 100, max_transforms = 1024, cpu = 4;
     double block_ms = 5;
-    std::filesystem::path output = "result";
+    std::filesystem::path output = "results/data";
     bool verify_only = false;
+    std::vector<unsigned> transformations;
 };
 inline ComputeOptions compute_options(int argc, char** argv) {
     ComputeOptions o;
@@ -27,6 +29,21 @@ inline ComputeOptions compute_options(int argc, char** argv) {
         if (i + 1 == argc) throw std::runtime_error("Fehlender Wert: " + arg);
         const std::string value = argv[++i];
         if (arg == "--output-dir") { o.output = value; continue; }
+        if (arg == "--transforms") {
+            std::istringstream list(value);
+            std::string item;
+            if (value.empty() || value.back() == ',') throw std::runtime_error("Leere Transformationszahl");
+            while (std::getline(list, item, ',')) {
+                if (item.empty() || item.find_first_not_of("0123456789") != std::string::npos)
+                    throw std::runtime_error("Ungueltige Transformationsliste");
+                const auto k = std::stoull(item);
+                if (k < 1 || k > 65536) throw std::runtime_error("Transformationen muessen in 1..65536 liegen");
+                o.transformations.push_back(static_cast<unsigned>(k));
+            }
+            std::sort(o.transformations.begin(), o.transformations.end());
+            o.transformations.erase(std::unique(o.transformations.begin(), o.transformations.end()), o.transformations.end());
+            continue;
+        }
         std::size_t consumed = 0;
         if (value.empty() || value[0] == '-') throw std::runtime_error("Ungueltiger Wert: " + value);
         const auto n = std::stoull(value, &consumed);
@@ -46,6 +63,9 @@ inline std::vector<unsigned> compute_counts(unsigned maximum) {
     for (unsigned k = 1; k <= maximum; k *= 2) counts.push_back(k);
     if (counts.back() != maximum) counts.push_back(maximum);
     return counts;
+}
+inline std::vector<unsigned> compute_counts(const ComputeOptions& o) {
+    return o.transformations.empty() ? compute_counts(o.max_transforms) : o.transformations;
 }
 template<class T> T compute_transform() {
     return T{0.8660254038f, -0.5f, 0.0f, 0.5f, 0.8660254038f, 0.0f,
@@ -89,8 +109,8 @@ struct ComputeResult { unsigned transforms; std::string method; std::vector<doub
 inline void compute_save(const ComputeOptions& o, const std::string& device,
                          const std::vector<ComputeResult>& results) {
     std::filesystem::create_directories(o.output);
-    std::ofstream out(o.output / ("compute_" + device + "_results.csv"));
-    std::ofstream raw(o.output / ("compute_" + device + "_samples.csv"));
+    std::ofstream out(o.output / ("compute_" + device + "_" + std::to_string(o.points) + "_results.csv"));
+    std::ofstream raw(o.output / ("compute_" + device + "_" + std::to_string(o.points) + "_samples.csv"));
     if (!out || !raw) throw std::runtime_error("Ergebnisdatei nicht schreibbar");
     out << "points;transformations;method;median_us;peak_us;samples;us_per_transform;invalid_samples\n";
     raw << "points;transformations;method;sample;us\n";
