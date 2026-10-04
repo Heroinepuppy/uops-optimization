@@ -20,7 +20,7 @@
 #define NOMINMAX
 #include <windows.h>
 
-constexpr std::size_t POINT_COUNT = 200'000;
+static std::size_t POINT_COUNT = 200'000;
 
 struct Point {
     float x;
@@ -646,7 +646,7 @@ static Stats compute_stats(const std::vector<double>& values) {
 }
 
 static void print_stats(const std::array<std::vector<double>, 7>& samples) {
-    std::cout << "\nZeit pro 200.000-Punkte-Cloud [us]\n\n";
+    std::cout << "\nZeit pro " << POINT_COUNT << "-Punkte-Cloud [us]\n\n";
     std::cout
         << std::left  << std::setw(15) << "Methode"
         << std::right << std::setw(11) << "Min"
@@ -707,10 +707,11 @@ static void plot_histograms(const std::array<std::vector<double>, 7>& samples) {
     std::filesystem::create_directories(result_dir);
     std::filesystem::create_directories(result_dir.parent_path() / "pics");
 
+    const std::string plot_name = "uop_benchmark" + (POINT_COUNT == 200000 ? std::string{} : "_" + std::to_string(POINT_COUNT));
     const std::filesystem::path png_path =
-        result_dir.parent_path() / "pics" / "uop_benchmark.png";
+        result_dir.parent_path() / "pics" / (plot_name + ".png");
     const std::filesystem::path script_path =
-        result_dir / "uop_benchmark.gp";
+        result_dir / (plot_name + ".gp");
 
     std::ofstream gp(script_path, std::ios::trunc);
     if (!gp) {
@@ -860,6 +861,8 @@ int main(int argc, char** argv) {
             target_block_ms = std::max(5.0, std::stod(arg));
         } else if (i == 3) {
             logical_cpu = static_cast<unsigned>(std::stoul(arg));
+        } else if (i == 4) {
+            POINT_COUNT = std::max<std::size_t>(1, std::stoull(arg));
         }
     }
 

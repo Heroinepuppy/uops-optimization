@@ -393,7 +393,7 @@ static void create_histograms(
     };
 
     // PNG
-    gp << "set term pngcairo size 2400,3200 enhanced font 'Segoe UI,9'\n";
+    gp << "set term pngcairo size 2400," << point_counts.size()*400 << " enhanced font 'Segoe UI,9'\n";
     gp << "set output '" << png_path.generic_string() << "'\n";
     emit_layout();
     gp << "unset output\n\n";
@@ -571,6 +571,7 @@ int main(int argc, char** argv)
     };
 
     const std::vector<std::size_t> point_counts{
+        16, 32, 64, 125, 250, 500,
         200'000,
         400'000,
         800'000,

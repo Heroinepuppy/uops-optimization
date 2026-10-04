@@ -2,6 +2,7 @@ import os
 """Sweep cloud size and chained transforms; compare CPU with GPU end-to-end latency."""
 import argparse
 import csv
+import colorsys
 import json
 from datetime import datetime, timezone
 import math
@@ -10,7 +11,13 @@ import shutil
 import subprocess
 
 ROOT = Path(".")
-SIZES = [10000, 25000, 50000, 100000] + [200000 * 2**i for i in range(8)]
+LEGACY_SIZES = [16, 32, 64, 125, 250, 500, 10000, 25000, 50000, 100000] + [200000 * 2**i for i in range(8)]
+# Preserve the existing grid and extend it down to 1,000 points at similar density.
+SIZES = sorted(set(LEGACY_SIZES) | {
+    round(10000 * (25600000 / 10000)**(i / 49)) for i in range(50)
+} | {
+    round(1000 * 10**(i / 15)) for i in range(16)
+})
 METHODS = {
     "CPU 4T / 4 CCX": "#D55E00",
     "GPU kernel only": "#56B4E9",
@@ -133,6 +140,9 @@ def plot(directory, sizes):
     colors = ['#0072B2', '#E69F00', '#009E73', '#CC79A7',
               '#D55E00', '#56B4E9', '#7B3294', '#333333',
               '#A6761D', '#E7298A', '#66A61E', '#1B9E77']
+    if len(sizes) > len(colors):
+        colors = ['#' + ''.join(f'{round(c*255):02X}' for c in colorsys.hsv_to_rgb(i/len(sizes), .75, .75))
+                  for i in range(len(sizes))]
     all_counts = sorted({k for counts in counts_by_size.values() for k in counts})
     upper = max(values[size,k,method] for size in sizes for k in counts_by_size[size]
                 for method in ('CPU 4T / 4 CCX', 'Upload + GPU + Download')) * 1.1
@@ -141,7 +151,7 @@ def plot(directory, sizes):
     step = next(magnitude*f for f in (1,2,2.5,5,10) if magnitude*f >= raw)
     upper = math.ceil(upper/step)*step
     xticks = all_counts[::max(1,math.ceil(len(all_counts)/10))]
-    commands += ["set terminal pngcairo size 2000,1200 enhanced font 'Segoe UI,12'",
+    commands += [f"set terminal pngcairo size 2000,{max(1200, len(sizes)*44+200)} enhanced font 'Segoe UI,12'",
                  f'set output {quote(pictures / "compute_combined.png")}',
                  'set origin 0,0', 'set size 1,1',
                  "set title 'CPU / GPU - alle Punktwolken-Groessen' font ',18'",

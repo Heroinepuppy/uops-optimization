@@ -985,7 +985,7 @@ python .\run_all_benchmarks.py
 
 Baut alle CPU- und GPU-Programme und fuehrt sie nacheinander aus: Uop-Test,
 Thread-Skalierung, GPU-Test, CPU/GPU-Vergleich, Transformations-Sweep von
-10.000 bis 25.600.000 Punkten, Verfeinerung mit bis zu 50 Zwischenwerten
+1.000 bis 25.600.000 Punkten, Verfeinerung mit bis zu 50 Zwischenwerten
 und beide Exponentialfit-Plots. Vorhandene Ergebnisse sind nicht erforderlich;
 der alte Ordner `result/` kann geloescht werden.
 
@@ -1000,3 +1000,22 @@ keine interaktiven Plotfenster geoeffnet.
 Voraussetzungen auf diesem System: Python, Gnuplot im PATH, Visual Studio
 2026 Community mit C++ und CMake, MSVC 14.44 sowie ROCm 7.2 (GPU gfx1100).
 `python run_all_benchmarks.py --dry-run` zeigt nur die Befehle.
+
+
+### Dichtere Punktwolken-Skalierung und Hyperbelfit
+
+Der Compute-Sweep misst standardmaessig 50 logarithmisch verteilte
+Punktwolkengroessen zwischen 10.000 und 25.600.000 Punkten. Mit den bisherigen
+Referenzgroessen sind es 60 eindeutige Groessen. Dazu kommen 15 logarithmisch
+verteilte Groessen von 1.000 bis unter 10.000 Punkten, insgesamt also 75.
+Die bisherigen Messgroessen bleiben erhalten. `--points` erlaubt weiterhin
+eine explizite Auswahl. Der Gesamtlauf verwendet diese Auswahl automatisch;
+die Verfeinerung mit bis zu 50 Zwischenwerten je Umschlagintervall bleibt bestehen.
+Mehr Punktgroessen erhoehen die Messdauer entsprechend.
+
+`fit_compute_crossover.py` erzeugt zusaetzlich `results/pics/crossover_hyperbola.png`
+und `results/data/crossover_hyperbola_fit.json`: K(N) = c + a/N, N in Millionen
+Punkten, angepasst mit ungewichteten kleinsten Fehlerquadraten an Intervallmitten.
+Der Bericht enthaelt Parameter, RMSE, R-Quadrat und Residuen (Messwert minus Fit).
+Die bisherigen Exponentialfits bleiben erhalten. Ein erneuter Fit allein
+erzeugt keine neuen Messpunkte.

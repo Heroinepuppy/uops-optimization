@@ -616,7 +616,8 @@ int main(int argc, char** argv) {
          1.25f,         -3.50f,         0.75f
     };
 
-    const std::array<std::size_t, 8> point_counts = {
+    const std::array<std::size_t, 14> point_counts = {
+        16, 32, 64, 125, 250, 500,
         200'000,
         400'000,
         800'000,
