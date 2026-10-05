@@ -1,27 +1,59 @@
-# uop-optimization
+## Benchmark-Matrix
 
-Experimentelles Repository zur Untersuchung von CPU-Optimierung auf mehreren Ebenen:
+`python benchmarks/run_all_benchmarks.py` ruft CPU und GPU in verschachtelten Schleifen auf:
+- Punktzahlen: 1, 2, 4, ... bis 33.554.432 (2^25, ca. 32M).
+- Transformationen: 1, 2, 4, ... bis 1024 (2^10).
+- Je Kombination und Geraet: 300 Messrunden (`--rounds 300`).
 
-- Datenlayout
-- Compiler-Vektorisierung
-- SIMD
-- AVX2/FMA
-- Loop-Unrolling
-- Instruction-Level Parallelism
-- SMT
-- Multi-Core-Skalierung
-- CCX-/L3-Topologie
-- Cache-/Memory-Hierarchie
+Das sind 286 Punktzahl-/Transformationskombinationen und insgesamt 1716 Programmaufrufe.
+Jede Kombination wird mit allen sieben CPU-Methoden (`aos`, `soa`, `auto`, `fma`,
+`avx2x2`, `avx2x4`, `avx2x8`) in allen fuenf Thread-Modi (`single`, `smt`,
+`same-ccx`, `different-ccx`, `four-ccx`) gemessen: 35 CPU-Varianten pro Kombination.
+Je Thread-Modus laeuft ein Aufruf mit `--method all`, mit 300 Messrunden je Methode.
+Hinzu kommt je Kombination ein GPU-Aufruf mit den vorhandenen vier Messmodi.
+Die gemeinsame CSV enthaelt den Thread-Modus in der Spalte `thread_mode`.
+300 bezeichnet Messrunden; Warm-up, Validierung und interne CPU-Blockwiederholungen
+bleiben Teil der Benchmarkprogramme.
+Alle Ergebnisse und Rohdaten stehen in `results/data/benchmark_matrix.csv`: eine Zeile
+pro Messrunde und Methode, mit Geraet, Punktzahl, Transformationen, Laufzeit, Median
+und Peak. Nach jedem erfolgreichen Aufruf wird gespeichert. Ein neuer Lauf ersetzt
+diese Datei; bei Abbruch bleiben die bereits gespeicherten Messungen erhalten.
+Pipeline-Logs sind standardmaessig aus. Mit `--pipeline-logs` werden zusaetzlich
+`pipeline_XX.log` geschrieben; die Terminalausgabe bleibt immer aktiv.
+CPU und GPU schreiben mit `--output-file` direkt an die gemeinsame CSV.
+Es werden keine temporaeren Ergebnisdateien oder `.matrix_*`-Ordner angelegt.
+Der Runner startet weder Build noch Verfeinerung oder Analyse.
+Die bisherigen Optionen `--phase`, `--plan-only`, `--steps` und `--source-dir` entfallen.
+`--dry-run` zeigt alle Aufrufe ohne Ausfuehrung oder Dateiaenderungen.
+Die beiden Vektoren `SIZES` und `TRANSFORMS` sowie `ROUNDS = 300` stehen fest im Skript.
+Optional: `--output-dir`.
 
-Der aktuelle Referenzprozessor ist ein **AMD Ryzen 9 3950X (Zen 2)**.
+Vorher ueber den VS-Code-Task `Build` CPU und GPU mit CMake bauen.
+Die Build-Tasks finden CMake ueber CMAKE_COMMAND, PATH oder den vorhandenen Buildcache.
+HIP wird ueber PATH oder HIP_PATH/ROCM_PATH gefunden.
+GPU-Einstellungen: `-DHIPCC_EXECUTABLE=...`, `-DLIDAR_GPU_ARCH=gfx1100`,
+`-DLIDAR_HIP_MSVC_VERSION=14.44`.
 
-Das Repository ist aus einer konkreten Fragestellung entstanden:
+## Gemeinsamer CPU-Benchmark
 
-> Wie viel Leistung lässt sich aus einem kleinen, sehr häufig ausgeführten LiDAR-Kernel herausholen, bevor man einfach größere oder teurere Hardware einsetzt?
+`build/vs2026/Release/lidar_compute_cpu.exe --points 125 --transforms 1,8 --method avx2x2 --thread-mode single`
 
-Der aktuelle Testkernel transformiert LiDAR-Punkte mit einer festen 3D-Rotation und Translation.
+Methoden: `aos`, `soa`, `auto` (Compiler-Vektorisierung), `fma` (AVX2/FMA),
+`avx2x2`, `avx2x4`, `avx2x8`, oder `all` (wechselnde Reihenfolge pro Messrunde).
+Thread-Modi: `single`, `smt`, `same-ccx`, `different-ccx`, `four-ccx`.
+Ohne explizite Auswahl: AVX2 x2, Single-Core, eine Transformation.
+`--cpu` waehlt den Ausgangskern; nicht verfuegbare Thread-Konfigurationen melden einen Fehler.
+`--verify-only` prueft Ergebnisse ohne Messdateien. `--rounds` und `--block-ms` steuern Messungen.
+Die originalen Einzeltransformations-Kernel bleiben erhalten; Ketten laden Punkte einmal,
+transformieren sie mehrfach und speichern das Endergebnis.
+Die CPU erzeugt nur CSVs mit Median, Peak und Rohdaten, keine Diagramme.
+Dateinamen unterscheiden Methoden und Thread-Modi, damit verschiedene Aufrufe sich nicht ueberschreiben.
+Die bisherigen Uop- und Threading-Programme sind durch dieses Programm ersetzt.
 
----
+## Aktueller Benchmark-Ablauf
+
+Es gilt die oben beschriebene Benchmark-Matrix. Die folgenden historischen
+Auswertungen beziehen sich auf fruehere Messreihen und Runner-Optionen.
 
 ## Testplattform
 
@@ -640,7 +672,7 @@ sind.
 Zusätzlich zu den CPU-Benchmarks enthält das Projekt nun:
 
 ```text
-lidar_gpu_benchmark.cpp
+benchmarks/lidar_compute_gpu.cpp
 ```
 
 Der GPU-Test ist bewusst **nicht** Teil des normalen CPU-Benchmark-Laufs.
@@ -737,7 +769,7 @@ After running both benchmarks, compare their saved peaks without re-running
 the measurements:
 
 ```powershell
-python .\plot_cpu_gpu.py
+python .\analysis/plot_cpu_gpu.py
 ```
 
 Alternatively use the VS Code task `Plot CPU vs GPU results`.
@@ -824,7 +856,7 @@ still providing the CPU reference needed for GPU break-even analysis.
 
 ## Dritter Test: Transformationsketten auf CPU und GPU
 
-`run_compute_benchmark.py` variiert zwei Groessen: 200.000 bis 25.600.000
+`benchmarks/run_all_benchmarks.py --phase sweep` variiert zwei Groessen: 200.000 bis 25.600.000
 Punkte (Verdopplung) und 1, 2, 4, ... 1024 Transformationen pro Punkt.
 Bei jeder Kette geht das Ergebnis einer Transformation in die naechste ein.
 Die Matrix wird nicht vorab potenziert. Eingaben werden einmal geladen,
@@ -838,7 +870,7 @@ verschiedenen L3/CCX-Gruppen. Bei K=1 wird der bestehende Kernel verwendet.
 Bei K>1 wird seine Operationsfolge pro 16 Punkte wiederholt. Pro Cloud gibt es
 ein Start-/Ende-Barrierenpaar. Fehlt die passende Topologie, bricht der Test ab.
 Der alte Groessen-Benchmark verwendet denselben unveraenderten CPU-Kern aus
-`lidar_cpu_core.h`.
+`benchmarks/lidar_cpu_methods.h`.
 
 GPU: ein HIP-Kernelstart pro Kette, 256 Threads pro Block. Die Messungen sind:
 
@@ -860,22 +892,22 @@ werden gegen eine Double-Referenz geprueft, einschliesslich Partitionsgrenzen.
 Bauen und ausfuehren (Developer-Terminal):
 
 ```powershell
-cmake --build build/vs2026 --config Release --target lidar_compute_cpu
-.\build_compute_gpu.cmd
-python .\run_compute_benchmark.py
+cmake -S . -B build/vs2026 -G "Visual Studio 18 2026" -A x64
+cmake --build build/vs2026 --config Release
+python .\benchmarks/run_all_benchmarks.py --phase sweep
 ```
 
-Alternativ VS-Code-Task **Compute: Run CPU vs GPU sweep** verwenden. Der GPU-Build
+Der VS-Code-Task **Build** baut beide Programme; Benchmarks separat starten. Der GPU-Build
 verwendet wie der vorhandene Test ROCm 7.2, MSVC 14.44 und `gfx1100`.
 Standard: 20 Messrunden je Kombination; der komplette Sweep kann mehrere Minuten dauern.
 
 ```powershell
 # Schneller Durchlauf ueber alle acht Punktzahlen:
-python .\run_compute_benchmark.py --rounds 5 --max-transforms 128
+python .\benchmarks/run_all_benchmarks.py --phase sweep --rounds 5 --max-transforms 128
 # Einzelne Punktzahl, hoehere Transformationszahlen:
-python .\run_compute_benchmark.py --points 200000 --max-transforms 4096 --output-dir results/data
+python .\benchmarks/run_all_benchmarks.py --phase sweep --points 200000 --max-transforms 4096 --output-dir results/data
 # Nur gespeicherte Ergebnisse neu plotten:
-python .\run_compute_benchmark.py --plot-only
+python .\benchmarks/run_all_benchmarks.py --phase sweep --plot-only
 ```
 
 Ausgabe: `results/data/compute_{cpu,gpu}_<Punktzahl>_{results,samples}.csv`,
@@ -896,7 +928,7 @@ mehr Messrunden und dichterer Abstufung nachgemessen werden.
 
 ### Umschlagintervalle mit bis zu 50 Zwischenwerten verfeinern
 
-`refine_compute_crossover.py` liest die CPU- und GPU-Medianwerte aus dem
+`benchmarks/run_all_benchmarks.py --phase refine` liest die CPU- und GPU-Medianwerte aus dem
 vorhandenen Sweep und sucht pro Punktzahl den ersten GPU-Roundtrip-Vorteil
 sowie den letzten vorherigen CPU-Vorteil. Dazwischen werden standardmaessig bis zu 50 gleichmaessig
 verteilte ganzzahlige Transformationszahlen ausgewaehlt. Bei schmalen
@@ -905,9 +937,9 @@ Beide alten Randpunkte werden ebenfalls erneut gemessen (bis zu 52 Werte insgesa
 
 ```powershell
 # Nur den automatisch erkannten Messplan anzeigen:
-python .\refine_compute_crossover.py --plan-only
+python .\benchmarks/run_all_benchmarks.py --phase refine --plan-only
 # Nach Neubau der beiden Compute-Executables messen und plotten:
-python .\refine_compute_crossover.py
+python .\benchmarks/run_all_benchmarks.py --phase refine
 ```
 
 VS-Code-Task: **Compute: Refine crossover** (inklusive Builds).
@@ -931,7 +963,7 @@ nur die Auswertung/Grafiken aus dem dort gespeicherten Messplan.
 ### Exponentialfit der Umschlagkurve
 
 ```powershell
-python .\fit_compute_crossover.py
+python .\analysis/fit_compute_crossover.py
 ```
 
 Pro Punktzahl wird die Mitte des ersten gemessenen Umschlagintervalls verwendet.
@@ -961,8 +993,8 @@ Der Compute-Sweep umfasst jetzt standardmaessig auch 10.000, 25.000, 50.000
 und 100.000 Punkte. Nur diese vier Groessen lassen sich so untersuchen:
 
 ```powershell
-python run_compute_benchmark.py --points 10000 25000 50000 100000 --rounds 30
-python refine_compute_crossover.py --steps 50 --rounds 30
+python benchmarks/run_all_benchmarks.py --phase sweep --points 10000 25000 50000 100000 --rounds 30
+python benchmarks/run_all_benchmarks.py --phase refine --steps 50 --rounds 30
 ```
 
 Das Zusammenfuehren kopiert die disjunkten Messreihen und dokumentiert ihre
@@ -980,10 +1012,11 @@ Suchgrenze von 10 pro Million Punkten kuenstlich begrenzt.
 ### Alles reproduzieren
 
 ```powershell
-python .\run_all_benchmarks.py
+python .\benchmarks/run_all_benchmarks.py
 ```
 
-Baut alle CPU- und GPU-Programme und fuehrt sie nacheinander aus: Uop-Test,
+Die CPU- und GPU-Programme vorher separat mit dem VS-Code-Task `Build` bauen.
+Der Benchmark-Runner fuehrt die Messungen nacheinander aus: Uop-Test,
 Thread-Skalierung, GPU-Test, CPU/GPU-Vergleich, Transformations-Sweep von
 1.000 bis 25.600.000 Punkten, Verfeinerung mit bis zu 50 Zwischenwerten
 und beide Exponentialfit-Plots. Vorhandene Ergebnisse sind nicht erforderlich;
@@ -993,13 +1026,12 @@ Alle Bilder liegen in `results/pics/`, alle CSV-Dateien, Fit-Parameter,
 Gnuplot-Skripte und Protokolle in `results/data/`. Feste Dateinamen werden
 bei jedem Lauf ueberschrieben; es entstehen keine Zeitstempelordner.
 `coarse_*.csv` bewahrt den vollstaendigen Sweep vor der Verfeinerung.
-`pipeline_status.json` nennt den aktuellen Schritt bzw. einen fehlgeschlagenen
-Schritt, `pipeline_XX.log` enthaelt dessen Ausgabe. Im Gesamtlauf werden
+`pipeline_XX.log` enthaelt bei aktiviertem `--pipeline-logs` die Ausgabe eines Schritts. Im Gesamtlauf werden
 keine interaktiven Plotfenster geoeffnet.
 
 Voraussetzungen auf diesem System: Python, Gnuplot im PATH, Visual Studio
 2026 Community mit C++ und CMake, MSVC 14.44 sowie ROCm 7.2 (GPU gfx1100).
-`python run_all_benchmarks.py --dry-run` zeigt nur die Befehle.
+`python benchmarks/run_all_benchmarks.py --dry-run` zeigt nur die Befehle.
 
 
 ### Dichtere Punktwolken-Skalierung und Hyperbelfit
@@ -1013,7 +1045,7 @@ eine explizite Auswahl. Der Gesamtlauf verwendet diese Auswahl automatisch;
 die Verfeinerung mit bis zu 50 Zwischenwerten je Umschlagintervall bleibt bestehen.
 Mehr Punktgroessen erhoehen die Messdauer entsprechend.
 
-`fit_compute_crossover.py` erzeugt zusaetzlich `results/pics/crossover_hyperbola.png`
+`analysis/fit_compute_crossover.py` erzeugt zusaetzlich `results/pics/crossover_hyperbola.png`
 und `results/data/crossover_hyperbola_fit.json`: K(N) = c + a/N, N in Millionen
 Punkten, angepasst mit ungewichteten kleinsten Fehlerquadraten an Intervallmitten.
 Der Bericht enthaelt Parameter, RMSE, R-Quadrat und Residuen (Messwert minus Fit).

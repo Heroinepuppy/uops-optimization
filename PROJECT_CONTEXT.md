@@ -1,4 +1,64 @@
-# PROJECT_CONTEXT.md
+## Codex bahaviour
+- Der Teil Codex behaviour wird NIE von Codex überschreiben, sonst kündige ich mein Abo.
+- Nicht alles in neuen Dateien anlegen.
+Beispiel, wenn ich sage specihere das Ergebnis in einer .csv Datei, will ich keinen Zwischenschritt über temporäre Verzeichnisse, in denen eine Datei angelegt wird die die Messergebnisse des letzten Schrittes hat und dann wieder ausgelesen wird, um das letzte Ergebnis der .csv Datei anzuhängen. Mach das direkt.
+
+
+## Benchmark-Matrix
+
+`python benchmarks/run_all_benchmarks.py` ruft CPU und GPU in verschachtelten Schleifen auf:
+- Punktzahlen: 1, 2, 4, ... bis 33.554.432 (2^25, ca. 32M).
+- Transformationen: 1, 2, 4, ... bis 1024 (2^10).
+- Je Kombination und Geraet: 300 Messrunden (`--rounds 300`).
+
+Das sind 286 Punktzahl-/Transformationskombinationen und insgesamt 1716 Programmaufrufe.
+Jede Kombination wird mit allen sieben CPU-Methoden (`aos`, `soa`, `auto`, `fma`,
+`avx2x2`, `avx2x4`, `avx2x8`) in allen fuenf Thread-Modi (`single`, `smt`,
+`same-ccx`, `different-ccx`, `four-ccx`) gemessen: 35 CPU-Varianten pro Kombination.
+Je Thread-Modus laeuft ein Aufruf mit `--method all`, mit 300 Messrunden je Methode.
+Hinzu kommt je Kombination ein GPU-Aufruf mit den vorhandenen vier Messmodi.
+Die gemeinsame CSV enthaelt den Thread-Modus in der Spalte `thread_mode`.
+300 bezeichnet Messrunden; Warm-up, Validierung und interne CPU-Blockwiederholungen
+bleiben Teil der Benchmarkprogramme.
+Alle Ergebnisse und Rohdaten stehen in `results/data/benchmark_matrix.csv`: eine Zeile
+pro Messrunde und Methode, mit Geraet, Punktzahl, Transformationen, Laufzeit, Median
+und Peak. Nach jedem erfolgreichen Aufruf wird gespeichert. Ein neuer Lauf ersetzt
+diese Datei; bei Abbruch bleiben die bereits gespeicherten Messungen erhalten.
+Pipeline-Logs sind standardmaessig aus. Mit `--pipeline-logs` werden zusaetzlich
+`pipeline_XX.log` geschrieben; die Terminalausgabe bleibt immer aktiv.
+Die Einzeldateien der Programme werden nur temporaer angelegt und danach entfernt.
+Der Runner startet weder Build noch Verfeinerung oder Analyse.
+Die bisherigen Optionen `--phase`, `--plan-only`, `--steps` und `--source-dir` entfallen.
+`--dry-run` zeigt alle Aufrufe ohne Ausfuehrung oder Dateiaenderungen.
+Die beiden Vektoren `SIZES` und `TRANSFORMS` sowie `ROUNDS = 300` stehen fest im Skript.
+Optional: `--output-dir`.
+
+Vorher ueber den VS-Code-Task `Build` CPU und GPU mit CMake bauen.
+Die Build-Tasks finden CMake ueber CMAKE_COMMAND, PATH oder den vorhandenen Buildcache.
+HIP wird ueber PATH oder HIP_PATH/ROCM_PATH gefunden.
+GPU-Einstellungen: `-DHIPCC_EXECUTABLE=...`, `-DLIDAR_GPU_ARCH=gfx1100`,
+`-DLIDAR_HIP_MSVC_VERSION=14.44`.
+
+## Gemeinsamer CPU-Benchmark
+
+`build/vs2026/Release/lidar_compute_cpu.exe --points 125 --transforms 1,8 --method avx2x2 --thread-mode single`
+
+Methoden: `aos`, `soa`, `auto` (Compiler-Vektorisierung), `fma` (AVX2/FMA),
+`avx2x2`, `avx2x4`, `avx2x8`, oder `all` (wechselnde Reihenfolge pro Messrunde).
+Thread-Modi: `single`, `smt`, `same-ccx`, `different-ccx`, `four-ccx`.
+Ohne explizite Auswahl: AVX2 x2, Single-Core, eine Transformation.
+`--cpu` waehlt den Ausgangskern; nicht verfuegbare Thread-Konfigurationen melden einen Fehler.
+`--verify-only` prueft Ergebnisse ohne Messdateien. `--rounds` und `--block-ms` steuern Messungen.
+Die originalen Einzeltransformations-Kernel bleiben erhalten; Ketten laden Punkte einmal,
+transformieren sie mehrfach und speichern das Endergebnis.
+Die CPU erzeugt nur CSVs mit Median, Peak und Rohdaten, keine Diagramme.
+Dateinamen unterscheiden Methoden und Thread-Modi, damit verschiedene Aufrufe sich nicht ueberschreiben.
+Die bisherigen Uop- und Threading-Programme sind durch dieses Programm ersetzt.
+
+## Aktueller Benchmark-Ablauf
+
+Es gilt die oben beschriebene Benchmark-Matrix. Die folgenden historischen
+Auswertungen beziehen sich auf fruehere Messreihen und Runner-Optionen.
 
 ## Zweck dieses Dokuments
 
@@ -175,7 +235,7 @@ Für GPU-Build muss explizit MSVC 14.44 geladen werden.
 Bewährter funktionierender Task:
 
 ```cmd
-mkdir "build\gpu" 2>nul & call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" -vcvars_ver=14.44 && "C:\Program Files\AMD\ROCm\7.2\bin\hipcc.exe" --offload-arch=gfx1100 -O3 -std=c++20 .\lidar_gpu_benchmark.cpp -o .\build\gpu\lidar_gpu_benchmark.exe
+cmake --build build/vs2026 --config Release --target lidar_compute_gpu
 ```
 
 Wichtig:
@@ -331,7 +391,7 @@ Keine unnötige Wiederholung der früheren Varianten.
 GPU-Datei:
 
 ```text
-lidar_gpu_benchmark.cpp
+benchmarks/lidar_compute_gpu.cpp
 ```
 
 Die Punktzahlen:
@@ -728,10 +788,10 @@ Sinnvoller Zielzustand:
 ```text
 uop-optimization/
 │
-├─ lidar_uop_benchmark.cpp
-├─ lidar_thread_scaling.cpp
+├─ benchmarks/lidar_uop_benchmark.cpp
+├─ benchmarks/lidar_thread_scaling.cpp
 ├─ lidar_cpu_large_benchmark.cpp
-├─ lidar_gpu_benchmark.cpp
+├─ benchmarks/lidar_compute_gpu.cpp
 ├─ analyze_break_even.py oder entsprechendes C++ Tool
 │
 ├─ result/
