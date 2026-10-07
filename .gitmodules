@@ -1,0 +1,4 @@
+[submodule "Agentic_behaviour"]
+	path = Agentic_behaviour
+	url = https://github.com/Heroinepuppy/Agentic_behaviour.git
+	branch = main

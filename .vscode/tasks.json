@@ -1,176 +1,40 @@
 {
   "version": "2.0.0",
+  "presentation": {
+    "reveal": "always",
+    "panel": "shared",
+    "echo": true
+  },
   "tasks": [
     {
-      "label": "Plot CPU vs GPU results",
-      "type": "shell",
-      "command": "python .\\plot_cpu_gpu.py",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "CMake Configure",
+      "label": "Configure",
       "type": "process",
-      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
+      "command": "powershell",
       "args": [
-        "-S",
-        ".",
-        "-B",
-        "build/vs2026",
-        "-G",
-        "Visual Studio 18 2026",
-        "-A",
-        "x64"
+        "-NoProfile",
+        "-Command",
+        "$cmakeExe = $env:CMAKE_COMMAND; if (-not $cmakeExe) { $found = Get-Command cmake -ErrorAction SilentlyContinue; if ($found) { $cmakeExe = $found.Source } }; if (-not $cmakeExe -and (Test-Path 'build/vs2026/CMakeCache.txt')) { $entry = Select-String -Path 'build/vs2026/CMakeCache.txt' -Pattern '^CMAKE_COMMAND:INTERNAL='; if ($entry) { $cmakeExe = $entry.Line.Split('=', 2)[1] } }; if (-not $cmakeExe) { throw 'CMake im PATH bereitstellen oder CMAKE_COMMAND setzen.' }; & $cmakeExe '-S' '.' '-B' 'build/vs2026' '-G' 'Visual Studio 18 2026' '-A' 'x64'; exit $LASTEXITCODE"
       ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Build Release",
-      "type": "process",
-      "command": "${env:ProgramFiles}\\Microsoft Visual Studio\\18\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe",
-      "args": [
-        "--build",
-        "build/vs2026",
-        "--config",
-        "Release"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": "CMake Configure",
-      "dependsOrder": "sequence",
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "Run uop benchmark",
-      "type": "shell",
-      "command": ".\\build\\vs2026\\Release\\lidar_uop_benchmark.exe",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": "Build Release",
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Run threading benchmark",
-      "type": "shell",
-      "command": ".\\build\\vs2026\\Release\\lidar_thread_scaling.exe",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": "Run uop benchmark",
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Build and run CPU benchmarks",
-      "type": "shell",
-      "command": "Write-Host 'CPU benchmarks complete.'",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": "Run threading benchmark",
-      "dependsOrder": "sequence",
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
-    },
-    {
-      "label": "GPU: Build",
-      "type": "shell",
-      "command": "mkdir \"build\\gpu\" 2>nul & call \"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat\" -vcvars_ver=14.44 && \"C:\\Program Files\\AMD\\ROCm\\7.2\\bin\\hipcc.exe\" --offload-arch=gfx1100 -O3 -std=c++20 .\\lidar_gpu_benchmark.cpp -o .\\build\\gpu\\lidar_gpu_benchmark.exe",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": [
-            "/d",
-            "/c"
-          ]
-        }
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "GPU: Run",
-      "type": "shell",
-      "command": ".\\build\\gpu\\lidar_gpu_benchmark.exe 200 256",
-      "options": {
-        "cwd": "${workspaceFolder}",
-        "shell": {
-          "executable": "C:\\Windows\\System32\\cmd.exe",
-          "args": [
-            "/d",
-            "/c"
-          ]
-        }
-      },
-      "dependsOn": "GPU: Build",
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Compute: Build GPU",
-      "type": "shell",
-      "command": ".\\build_compute_gpu.cmd",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Compute: Run CPU vs GPU sweep",
-      "type": "shell",
-      "command": "python .\\run_compute_benchmark.py",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": [
-        "Build Release",
-        "Compute: Build GPU"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Compute: Plot saved results",
-      "type": "shell",
-      "command": "python .\\run_compute_benchmark.py --plot-only",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Compute: Refine crossover",
-      "type": "shell",
-      "command": "python .\\refine_compute_crossover.py",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "dependsOn": [
-        "Build Release",
-        "Compute: Build GPU"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": []
-    },
-    {
-      "label": "Run all benchmarks and plots",
-      "type": "shell",
-      "command": "python .\\run_all_benchmarks.py",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": [],
+      "hide": true
+    },
+    {
+      "label": "Build",
+      "type": "process",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$cmakeExe = $env:CMAKE_COMMAND; if (-not $cmakeExe) { $found = Get-Command cmake -ErrorAction SilentlyContinue; if ($found) { $cmakeExe = $found.Source } }; if (-not $cmakeExe -and (Test-Path 'build/vs2026/CMakeCache.txt')) { $entry = Select-String -Path 'build/vs2026/CMakeCache.txt' -Pattern '^CMAKE_COMMAND:INTERNAL='; if ($entry) { $cmakeExe = $entry.Line.Split('=', 2)[1] } }; if (-not $cmakeExe) { throw 'CMake im PATH bereitstellen oder CMAKE_COMMAND setzen.' }; & $cmakeExe '--build' 'build/vs2026' '--config' 'Release'; exit $LASTEXITCODE"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Configure",
+      "problemMatcher": "$msCompile",
       "group": {
         "kind": "build",
         "isDefault": true
