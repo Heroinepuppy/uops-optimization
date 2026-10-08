@@ -17,6 +17,7 @@ struct ComputeOptions {
     std::size_t points = 200000;
     unsigned rounds = 100, max_transforms = 1024, cpu = 4;
     double block_ms = 5;
+    unsigned max_seconds = 600;
     std::filesystem::path output = "results/data";
     std::filesystem::path output_file;
     std::string output_prefix;
@@ -25,10 +26,12 @@ struct ComputeOptions {
     std::vector<unsigned> transformations;
 };
 // Estimate once from the first complete round; that round already counts.
-inline unsigned compute_round_limit(unsigned requested, double round_seconds) {
+// requested: positive round cap; round_seconds: measured duration in seconds;
+// max_seconds: estimated measurement budget in seconds, in 1..100000000.
+inline unsigned compute_round_limit(unsigned requested, double round_seconds, unsigned max_seconds) {
     if (round_seconds <= 0) return requested;
     return static_cast<unsigned>(std::max(1.0, std::min(
-        static_cast<double>(requested), std::floor(600.0 / round_seconds))));
+        static_cast<double>(requested), std::floor(max_seconds / round_seconds))));
 }
 
 inline ComputeOptions compute_options(int argc, char** argv) {
@@ -69,6 +72,7 @@ inline ComputeOptions compute_options(int argc, char** argv) {
             throw std::runtime_error("Ungueltiger Wert: " + value);
         if (arg == "--points") o.points = static_cast<std::size_t>(n);
         else if (arg == "--rounds") o.rounds = static_cast<unsigned>(n);
+        else if (arg == "--max-seconds") o.max_seconds = static_cast<unsigned>(n);
         else if (arg == "--max-transforms" && n <= 65536) o.max_transforms = static_cast<unsigned>(n);
         else if (arg == "--cpu" && n < 64) o.cpu = static_cast<unsigned>(n);
         else if (arg == "--block-ms" && n <= 1000) o.block_ms = static_cast<double>(n);

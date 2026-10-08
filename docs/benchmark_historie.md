@@ -71,6 +71,18 @@ wurden Verfeinerungen sowie Exponential- und Hyperbelmodelle eingefuehrt. Die ak
 Analyse kann gespeicherte Daten dazu auswerten; die alten Runner-Befehle fuer diese
 Phasen sind keine gueltige Bedienungsanleitung mehr.
 
+## Geplante Bereinigung nach der ersten Auswertung
+
+- Nach Abschluss des ersten Benchmarklaufs und seiner ersten Auswertung den
+  Sondernamen `CPU 4T / 4 CCX` durch `avx2x2 / four-ccx` ersetzen.
+- Terminalausgabe, CSV, Analyse und Diagramme verwenden danach einheitlich
+  den neuen Namen. In der weiterverwendeten CSV soll ausschliesslich der neue
+  Name stehen; vorhandene Eintraege werden bei der Umstellung entsprechend
+  vereinheitlicht.
+- Resume und Analyse auf den neuen Namen umstellen. Eine dauerhafte
+  Unterstuetzung beider Namen ist nicht vorgesehen.
+- Bis zur ersten Auswertung bleiben Benchmarkcode und Messdaten unveraendert.
+
 ## Offene Untersuchungsrichtungen
 
 Aus den alten Projekttexten bleiben als moegliche Experimente: wechselnde

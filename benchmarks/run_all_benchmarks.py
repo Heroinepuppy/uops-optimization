@@ -23,7 +23,7 @@ RESULT_FIELDS = ['device', 'thread_mode', 'points', 'transformations', 'method',
                  'median_us', 'peak_us', 'samples', 'us_per_transform', 'invalid_samples']
 
 
-def matrix_commands(sizes, counts, rounds, directory):
+def matrix_commands(sizes, counts, rounds, directory, max_seconds=600):
     """Yield CPU and GPU commands for each combination of matrix parameters.
 
     Args:
@@ -35,11 +35,14 @@ def matrix_commands(sizes, counts, rounds, directory):
         rounds: Positive maximum sample count per method; configured as 300.
         directory: pathlib.Path to any valid output directory containing the
             shared results CSV, normally relative to the project root.
+        max_seconds: Integer estimated time budget per measurement block in
+            seconds, in 1..100000000; defaults to 600. Not a hard timeout.
     """
     for points in sizes:
         for transforms in counts:
             common = ['--points', str(points), '--transforms', str(transforms),
-                      '--rounds', str(rounds), '--output-file', str(directory / 'benchmark_matrix.csv')]
+                      '--rounds', str(rounds), '--max-seconds', str(max_seconds),
+                      '--output-file', str(directory / 'benchmark_matrix.csv')]
             for mode in CPU_THREAD_MODES:
                 # The CPU executable measures all seven methods in shuffled order.
                 yield [CPU_EXE, *common, '--method', 'all', '--thread-mode', mode]
@@ -226,6 +229,8 @@ def main(argv=None):
             '--dry-run' prints pending commands without execution or writes;
             '--pipeline-logs' saves raw output per call (disabled by default);
             '--restart' starts over instead of resuming existing results;
+            '--max-seconds N' sets the estimated time budget per measurement
+            block in whole seconds, in 1..100000000 (default: 600);
             '--output-dir PATH' selects any valid output directory (default:
             'results/data'); '-h' or '--help' prints help and exits.
     """
@@ -236,14 +241,18 @@ def main(argv=None):
     parser.add_argument('--pipeline-logs', action='store_true', help='Write per-step pipeline log files (disabled by default)')
     parser.add_argument('--restart', action='store_true', help='Discard existing results and start from the beginning')
     parser.add_argument('--output-dir', type=Path, default=Path('results/data'))
+    parser.add_argument('--max-seconds', type=int, default=300,
+                        help='Estimated seconds per measurement block (default: 600); not a hard timeout')
     args = parser.parse_args(argv)
+    if not 1 <= args.max_seconds <= 100000000:
+        parser.error('--max-seconds must be in 1..100000000')
     directory = Path(os.path.relpath(args.output_dir))
     total = len(SIZES) * len(TRANSFORMS) * (len(CPU_THREAD_MODES) + 1)
     print(f'Matrix: {len(SIZES)} Punktgroessen x {len(TRANSFORMS)} Transformationszahlen '
           f'x ({len(CPU_THREAD_MODES)} CPU-Thread-Modi mit allen {len(CPU_METHODS)} Methoden + GPU) '
           f'= {total} Aufrufe, jeweils maximal {ROUNDS} Messrunden pro Methode '
-          '(10 min Hochrechnung nach der ersten Runde).', flush=True)
-    commands = list(matrix_commands(SIZES, TRANSFORMS, ROUNDS, directory))
+          f'({args.max_seconds} s Hochrechnung nach der ersten Runde).', flush=True)
+    commands = list(matrix_commands(SIZES, TRANSFORMS, ROUNDS, directory, args.max_seconds))
     runner = Runner(directory, args.dry_run, args.pipeline_logs, total)
     result_path = directory / 'benchmark_matrix.csv'
     try:
