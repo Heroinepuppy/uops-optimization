@@ -155,9 +155,9 @@ int main(int argc,char** argv) try {
             }
             if(round==0) {
                 const double seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-first_round_start).count();
-                rounds=compute_round_limit(o.rounds,seconds);
+                rounds=compute_round_limit(o.rounds,seconds,o.max_seconds);
                 std::cout << "Erste Messrunde: " << seconds << " s; Rundenlimit: " << o.rounds
-                          << " -> " << rounds << " (10 min Hochrechnung)\n" << std::flush;
+                          << " -> " << rounds << " (" << o.max_seconds << " s Hochrechnung)\n" << std::flush;
             }
             if((round+1)%10==0 || round+1==rounds)
                 std::cout << "Messrunde " << round+1 << " / " << rounds << '\n' << std::flush;
