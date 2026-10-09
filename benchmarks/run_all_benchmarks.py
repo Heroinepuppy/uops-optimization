@@ -95,8 +95,7 @@ def resume_position(source, commands):
         cpu = command[0] == CPU_EXE
         device = 'cpu' if cpu else 'gpu'
         mode = arg('--thread-mode') if cpu else ''
-        methods = ({'CPU 4T / 4 CCX' if m == 'avx2x2' and mode == 'four-ccx'
-                    else f'{m} / {mode}' for m in CPU_METHODS} if cpu else
+        methods = ({f'{m} / {mode}' for m in CPU_METHODS} if cpu else
                    {'GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download'})
         max_rounds = int(arg('--rounds'))
         rounds = None
@@ -111,6 +110,8 @@ def resume_position(source, commands):
                 if len(fields) != len(RESULT_FIELDS):
                     raise ValueError('Spaltenzahl')
                 row = dict(zip(RESULT_FIELDS, fields))
+                if row['method'] == 'CPU 4T / 4 CCX':
+                    row['method'] = 'avx2x2 / four-ccx'
                 if rounds is None:
                     rounds = int(row['samples'])
                     if not 1 <= rounds <= max_rounds:

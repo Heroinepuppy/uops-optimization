@@ -8,7 +8,16 @@ import os
 from pathlib import Path
 import shutil
 
-METHODS = ("CPU 4T / 4 CCX", "GPU kernel only", "GPU resident (host sync)", "Upload + GPU", "Upload + GPU + Download")
+METHODS = ("avx2x2 / four-ccx", "GPU kernel only", "GPU resident (host sync)", "Upload + GPU", "Upload + GPU + Download")
+
+
+def canonical_method(method):
+    """Normalize a historical CPU label when reading existing results.
+
+    Args:
+        method: Any method-name string; unrelated names remain unchanged.
+    """
+    return 'avx2x2 / four-ccx' if method == 'CPU 4T / 4 CCX' else method
 
 
 def relative_path(path):
@@ -68,7 +77,7 @@ def load(directory, sizes):
                     for row in csv.DictReader(source, delimiter=';'):
                         if int(row['points']) != size:
                             raise ValueError(f'Falsche Punktzahl in {path}')
-                        key = (size, int(row['transformations']), row['method'])
+                        key = (size, int(row['transformations']), canonical_method(row['method']))
                         value = float(row['median_us'])
                         if key in seen or not math.isfinite(value) or value <= 0 or int(row['samples']) <= 0:
                             raise ValueError(f'Ungueltige Messung in {path}: {key}')
@@ -147,7 +156,7 @@ def read_cpu_results(directory):
         return {(size, names[mode]): float(row['peak_us'])
                 for (device, mode, size, transforms, method), row in read_matrix(directory).items()
                 if device == 'cpu' and transforms == 1
-                and (method == 'CPU 4T / 4 CCX' or method == f'avx2x2 / {mode}')}
+                and method == f'avx2x2 / {mode}'}
     paths = sorted(directory.glob('threading_compute_cpu*_results.csv'))
     if not paths:
         return read_results(directory / 'cpu_results.txt')
@@ -161,7 +170,7 @@ def read_cpu_results(directory):
             for row in csv.DictReader(source, delimiter=';'):
                 if int(row['transformations']) != 1:
                     continue
-                mode = 'four-ccx' if row['method'] == 'CPU 4T / 4 CCX' else row['method'].split(' / ')[-1]
+                mode = canonical_method(row['method']).split(' / ')[-1]
                 key = int(row['points']), names[mode]
                 peak = float(row['peak_us'])
                 if key in results or not math.isfinite(peak) or peak <= 0 or int(row['samples']) <= 0:
@@ -201,7 +210,7 @@ def sample_groups(path, transforms, device=None):
                 continue
             if int(row["transformations"]) != transforms:
                 continue
-            key = (int(row["points"]), transforms, row["method"])
+            key = (int(row["points"]), transforms, canonical_method(row["method"]))
             value = float(row["us"])
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"Ungueltige Messung: {path}")
@@ -268,8 +277,9 @@ def read_matrix(directory):
     with path.open(encoding='utf-8-sig', newline='') as stream:
         for number, row in enumerate(csv.DictReader(stream, delimiter=';'), 2):
             try:
+                row['method'] = canonical_method(row['method'])
                 key = (row['device'], row['thread_mode'], int(row['points']),
-                       int(row['transformations']), row['method'])
+                       int(row['transformations']), canonical_method(row['method']))
                 count, sample = int(row['samples']), int(row['sample'])
                 if key[0] not in ('cpu', 'gpu') or min(key[2:4]) <= 0:
                     raise ValueError('Ungueltige Matrixparameter')

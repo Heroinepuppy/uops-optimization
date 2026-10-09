@@ -50,6 +50,17 @@ class ResumeTests(unittest.TestCase):
                 self.assertEqual(runner.resume_position(io.BytesIO(tail), self.commands),
                                  (1, len(self.encode(first))))
 
+    def test_resume_with_new_and_mixed_method_names(self):
+        for mixed in (False, True):
+            rows = [row for command in self.commands for row in self.block(command, 2)]
+            for row in rows:
+                if row['method'] == 'CPU 4T / 4 CCX' and (not mixed or row['sample'] == 1):
+                    row['method'] = 'avx2x2 / four-ccx'
+            encoded = self.encode(rows)
+            with self.subTest(mixed=mixed):
+                self.assertEqual(runner.resume_position(io.BytesIO(encoded), self.commands),
+                                 (len(self.commands), len(encoded)))
+
     def test_invalid_counts_duplicates_and_missing_method_rejected(self):
         for change in ('zero', 'too_many', 'inconsistent', 'duplicate', 'method'):
             rows = self.block(self.commands[0], 2)

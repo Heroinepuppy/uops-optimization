@@ -35,6 +35,21 @@ def write_matrix(directory):
 
 
 class AnalysisTests(unittest.TestCase):
+    def test_legacy_and_mixed_names_are_normalized(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            rows = write_matrix(directory)
+            expected = data.load(directory, None)
+            for mixed in (False, True):
+                changed = [dict(row) for row in rows]
+                for row in changed:
+                    if row['device'] == 'cpu' and (not mixed or row['sample'] == 0):
+                        row['method'] = 'CPU 4T / 4 CCX'
+                data.write_csv(directory / 'benchmark_matrix.csv', changed)
+                self.assertEqual(data.load(directory, None), expected)
+                self.assertTrue(all(key[-1] != 'CPU 4T / 4 CCX'
+                                    for key in data.sample_groups(directory / 'benchmark_matrix.csv', 1)))
+
     def test_no_selection_does_not_read_data(self):
         with patch.object(data, 'load', side_effect=AssertionError('data access')):
             with redirect_stdout(io.StringIO()):
