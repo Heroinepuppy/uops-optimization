@@ -3,7 +3,7 @@
 import math
 import random
 
-CPU = "CPU 4T / 4 CCX"
+CPU = "avx2x2 / four-ccx"
 GPU = "Upload + GPU + Download"
 
 
@@ -220,14 +220,14 @@ def crossover_summary(values, counts_by_size, sizes):
     crossings = []
     for size in sizes:
         counts = counts_by_size[size]
-        wins = [values[size,k,'Upload + GPU + Download'] < values[size,k,'CPU 4T / 4 CCX'] for k in counts]
+        wins = [values[size,k,'Upload + GPU + Download'] < values[size,k,'avx2x2 / four-ccx'] for k in counts]
         first = next((i for i, win in enumerate(wins) if win), None)
         sustained = next((i for i, win in enumerate(wins) if win and all(wins[i:])), None)
         crossings.append({
             'points': size,
             'last_tested_transformations': counts[-1],
             'first_gpu_win': '' if first is None else counts[first],
-            'cpu_median_us_at_first_win': '' if first is None else values[size,counts[first],'CPU 4T / 4 CCX'],
+            'cpu_median_us_at_first_win': '' if first is None else values[size,counts[first],'avx2x2 / four-ccx'],
             'gpu_roundtrip_median_us_at_first_win': '' if first is None else values[size,counts[first],'Upload + GPU + Download'],
             'previous_tested_transformations': '' if first is None or first == 0 else counts[first-1],
             'gpu_faster_at_all_later_tested_counts_from': '' if sustained is None else counts[sustained],
@@ -237,16 +237,16 @@ def crossover_summary(values, counts_by_size, sizes):
 
 def crossover_fit_report(values, counts, all_rows, has_refinements=False):
     stale = has_refinements or not all_rows or any(
-        (int(r['points']), int(r[field]), 'CPU 4T / 4 CCX') not in values
+        (int(r['points']), int(r[field]), 'avx2x2 / four-ccx') not in values
         for r in all_rows for field in ('last_cpu_faster_before_first_gpu_win','first_gpu_faster')
         if r[field])
     if stale:
         all_rows = []
         for n, ks in sorted(counts.items()):
-            wins = [values[n,k,'CPU 4T / 4 CCX'] > values[n,k,'Upload + GPU + Download'] for k in ks]
+            wins = [values[n,k,'avx2x2 / four-ccx'] > values[n,k,'Upload + GPU + Download'] for k in ks]
             first = next((i for i,win in enumerate(wins) if win), None)
             below = [] if first is None else [k for k in ks[:first]
-                if values[n,k,'CPU 4T / 4 CCX'] < values[n,k,'Upload + GPU + Download']]
+                if values[n,k,'avx2x2 / four-ccx'] < values[n,k,'Upload + GPU + Download']]
             all_rows.append(dict(points=n,
                 last_cpu_faster_before_first_gpu_win=below[-1] if below else '',
                 first_gpu_faster=ks[first] if first is not None else '',
@@ -257,7 +257,7 @@ def crossover_fit_report(values, counts, all_rows, has_refinements=False):
     for r in rows:
         n=int(r['points']);lo=int(r['last_cpu_faster_before_first_gpu_win']);hi=int(r['first_gpu_faster'])
         x=(lo+hi)/2
-        y=(values[n,lo,'CPU 4T / 4 CCX']+values[n,hi,'CPU 4T / 4 CCX'])/2
+        y=(values[n,lo,'avx2x2 / four-ccx']+values[n,hi,'avx2x2 / four-ccx'])/2
         points.append((x,y));records.append(dict(points=n,x=x,y_us=y,lower=lo,upper=hi,winner_changes=int(r['winner_changes'])))
     if len(points)<4:raise ValueError('Mindestens vier Umschlagintervalle erforderlich')
     results=[fit(points,False),fit(points,True)]

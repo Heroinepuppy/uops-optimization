@@ -134,7 +134,7 @@ int main(int argc,char** argv) try {
                 repeats[m]*=2;
                 calibration_us=measure(m,repeats[m]);
             }
-            const auto label=o.thread_mode=="four-ccx" && m==4 ? "CPU 4T / 4 CCX" : METHODS[m]+" / "+o.thread_mode;
+            const auto label=METHODS[m]+" / "+o.thread_mode;
             // Normalize over repeats and transformations of the whole point set.
             std::cout << "Kalibrierung " << label << ": " << repeats[m]
                       << " Durchlaeufe; Ziel " << o.block_ms << " ms; Block "
