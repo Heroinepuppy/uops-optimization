@@ -264,15 +264,18 @@ def has_refinements(directory):
     return any(directory.glob('refined_compute_*_results.csv'))
 
 
-def read_matrix(directory):
+def read_matrix(directory, raw_samples=False):
     """Read completed sample series, preserving device, mode and method identity.
 
     Summary columns repeat once per sample in the runner's CSV. Reject missing
     samples and inconsistent summaries instead of treating a partial series as
     a finished measurement. No file is opened until this function is called.
+    With raw_samples=True, return lists of measured us values per key instead
+    of summary rows, using the same completeness and duplicate checks.
     """
     path = directory / 'benchmark_matrix.csv'
     records = {}
+    values = {}
     samples = {}
     with path.open(encoding='utf-8-sig', newline='') as stream:
         for number, row in enumerate(csv.DictReader(stream, delimiter=';'), 2):
@@ -295,6 +298,8 @@ def read_matrix(directory):
                                           for field in ('samples', 'median_us', 'peak_us')):
                     raise ValueError('Widerspruechliche Zusammenfassung')
                 seen.add(sample)
+                if raw_samples:
+                    values.setdefault(key, []).append(float(row['us']))
                 records.setdefault(key, row)
             except (KeyError, TypeError, ValueError) as exc:
                 raise ValueError(f'{path}:{number}: {exc}') from exc
@@ -303,4 +308,4 @@ def read_matrix(directory):
             raise ValueError(f'Unvollstaendige Messreihe: {key}')
     if not records:
         raise ValueError(f'Keine Messungen: {path}')
-    return records
+    return values if raw_samples else records

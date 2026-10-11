@@ -2,7 +2,7 @@
 
 import math
 
-from calculations import CPU, GPU, exponential, grid, histogram, stepped
+from calculations import CPU, GPU, exponential, grid, histogram, histogram_peak, stepped
 
 METHODS = {CPU: '#D55E00', 'GPU kernel only': '#56B4E9',
            'GPU resident (host sync)': '#009E73', 'Upload + GPU': '#8C564B',
@@ -159,6 +159,90 @@ def histogram_plot(groups, stem):
 
 
 
+
+
+CPU_ORDER = ('aos', 'soa', 'auto', 'fma', 'avx2x2', 'avx2x4', 'avx2x8')
+MODE_ORDER = ('single', 'smt', 'same-ccx', 'different-ccx', 'four-ccx')
+GPU_ORDER = ('GPU kernel only', 'GPU resident (host sync)',
+             'Upload + GPU', 'Upload + GPU + Download')
+
+
+def matrix_tests(samples):
+    """Stable column order: CPU modes with seven methods each, then GPU."""
+    present = {(device, mode, method) for device, mode, _, _, method in samples}
+    expected = [('cpu', mode, f'{method} / {mode}')
+                for mode in MODE_ORDER for method in CPU_ORDER]
+    expected += [('gpu', '', method) for method in GPU_ORDER]
+    return [test for test in expected if test in present] + sorted(present - set(expected))
+
+
+def histogram_matrix_plot(samples):
+    """One PNG per point count; columns are tests, rows transformations."""
+    tests = matrix_tests(samples)
+    counts = sorted({key[3] for key in samples})
+    for size in sorted({key[2] for key in samples}):
+        # Compact panels keep even the full 39-column matrix renderable.
+        figure, axes = pyplot().subplots(
+            len(counts), len(tests), squeeze=False,
+            figsize=(2.4 * len(tests), 1.8 * len(counts)), layout='constrained')
+        figure.suptitle(f'{size} Punkte — Histogramme (60 Bins); rote Linie: Peak')
+        for row, count in enumerate(counts):
+            for column, (device, mode, method) in enumerate(tests):
+                axis = axes[row, column]
+                values = samples.get((device, mode, size, count, method))
+                if row == 0:
+                    axis.set_title(method.replace(' / ', '\n'), fontsize=8)
+                if column == 0:
+                    axis.set_ylabel(f'{count} Transformationen\nHaeufigkeit', fontsize=8)
+                if row == len(counts) - 1:
+                    axis.set_xlabel('Laufzeit pro Cloud [us]', fontsize=7)
+                axis.tick_params(labelsize=6)
+                if not values:
+                    axis.text(.5, .5, 'Keine Messung', ha='center', transform=axis.transAxes, fontsize=7)
+                    continue
+                width, bins = histogram(values)
+                centers, frequencies = zip(*bins)
+                axis.bar(centers, frequencies, width=width, color='#56B4E9')
+                peak = histogram_peak(values)
+                axis.axvline(peak, color='#D55E00', linewidth=1)
+                axis.text(.98, .95, f'n={len(values)}\nPeak={peak:.6g} us',
+                          ha='right', va='top', transform=axis.transAxes, fontsize=6)
+        yield f'histograms_points_{size}', figure
+
+
+def runtime_by_points_plot(samples):
+    """Histogram peaks of full chains; one overview per CPU thread mode."""
+    tests = matrix_tests(samples)
+    sizes = sorted({key[2] for key in samples})
+    counts = sorted({key[3] for key in samples})
+    modes = list(dict.fromkeys(mode for device, mode, _ in tests if device == 'cpu'))
+    peaks = {key: histogram_peak(values) for key, values in samples.items()}
+    palette = pyplot().get_cmap('tab20')
+    labels = list(CPU_ORDER) + list(GPU_ORDER)
+    for mode in modes or ['gpu']:
+        selected = [test for test in tests if test[0] == 'gpu' or test[1] == mode]
+        figure, axes = panels(len(counts), f'Laufzeit nach Punktgroesse — {mode} — Histogramm-Peaks')
+        for axis, count in zip(axes, counts):
+            for device, thread_mode, method in selected:
+                label = method.split(' / ')[0] if device == 'cpu' else method
+                color = palette(labels.index(label) if label in labels else 19)
+                keys = [(device, thread_mode, size, count, method) for size in sizes]
+                axis.plot(sizes, [peaks.get(key, float('nan')) for key in keys],
+                          'o--' if device == 'gpu' else 'o-', color=color,
+                          markersize=3, label=label)
+                single = [key for key in keys if key in samples and len(samples[key]) == 1]
+                if single:
+                    axis.scatter([key[2] for key in single], [peaks[key] for key in single],
+                                 marker='x', color=color, zorder=4)
+            axis.set_xscale('log', base=2)
+            axis.set_yscale('log')
+            axis.set(title=f'{count} Transformationen', xlabel='Punkte pro Cloud',
+                     ylabel='Laufzeit pro Cloud [us]')
+            axis.grid(alpha=.2)
+        handles, legend_labels = axes[0].get_legend_handles_labels()
+        figure.legend(handles, legend_labels, loc='outside lower center', ncol=4, fontsize=8)
+        figure.supxlabel('Gesamte Transformationskette; x markiert Messungen mit nur einer Stichprobe', fontsize=9)
+        yield f'runtime_by_points_{mode}', figure
 
 
 def boundary_axis(axis, records):

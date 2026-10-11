@@ -15,6 +15,17 @@ def histogram(values):
         bins[min(59, int((value - low) / width))] += 1
     return width, [(low + (i + 0.5) * width, count) for i, count in enumerate(bins)]
 
+def histogram_peak(values):
+    """Center of the most populated of 60 bins; ties choose the lower bin.
+
+    Constant series (including a single sample) retain their exact value.
+    """
+    if min(values) == max(values):
+        return values[0]
+    _, bins = histogram(values)
+    return max(bins, key=lambda item: item[1])[0]
+
+
 def fit(points, offset):
     x0=min(x for x,y in points)
     ys=[y for x,y in points]

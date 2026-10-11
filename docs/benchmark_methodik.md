@@ -113,6 +113,45 @@ als Rundenobergrenze gesetzt. Die erste Runde zaehlt mit; Vorbereitung und
 Kalibrierung sind nicht Teil dieser Hochrechnung. Schwankungen oder eine einzelne
 lange Runde koennen die geschaetzten zehn Minuten ueberschreiten.
 
+## GPU-Arithmetik: FMA und Matrix-Anweisungen
+
+Der HIP-Kernel in [lidar_compute_gpu.cpp](../benchmarks/lidar_compute_gpu.cpp)
+verwendet bereits explizit `fmaf`, beispielsweise fuer die X-Koordinate:
+
+```cpp
+const float nx = fmaf(t.r02, Z, fmaf(t.r01, Y, t.r00 * X)) + t.tx;
+```
+
+`fmaf(a, b, c)` berechnet `a * b + c` als Fused Multiply-Add mit nur einer
+Rundung des Ergebnisses. Das entspricht dem arithmetischen Prinzip der
+CPU-FMA-Variante. Im Quellcode stehen pro Koordinate zwei verschachtelte
+FMA-Aufrufe, eine separate Multiplikation und die Addition der Translation:
+insgesamt sechs explizite FMA-Aufrufe pro Punkt und Transformationsschritt.
+Die gesamte Koordinatenberechnung ist damit nicht nur eine einzige gerundete
+Operation. Gegenueber getrennten Multiplikationen und Additionen koennen
+sich die Rundungsergebnisse unterscheiden.
+
+Ein GPU-Thread verarbeitet einen Punkt. Die Transformationskette arbeitet
+mit lokalen Koordinatenwerten und schreibt erst das Endergebnis zurueck.
+Alle vier GPU-Messpfade verwenden denselben Kernel und damit dieselbe
+FMA-Arithmetik; sie unterscheiden sich im gemessenen Transfer- und
+Synchronisationsumfang. Es gibt derzeit keine separate GPU-Variante ohne FMA.
+Die konkreten Maschinenbefehle und ihre Anzahl im fertigen Programm wurden
+hier nicht durch Disassemblierung nachgewiesen.
+
+GPU-Architekturen koennen darueber hinaus spezielle Matrix-Multiply-Add-
+Anweisungen fuer ganze Matrixbloecke anbieten. AMDs MFMA-Anweisungen auf
+CDNA/Instinct sind ein Beispiel; Verfuegbarkeit, Blockformate und Datentypen
+haengen von der Zielarchitektur ab. Der aktuelle Kernel verwendet solche
+Matrix-Intrinsics nicht. Ihre Nutzung fuer die 3x3-Transformation mit
+Translation wuerde eine eigene Kernel-Variante und passende Datenaufteilung
+erfordern. Ein Laufzeitvorteil oder gleiche numerische Ergebnisse sind damit
+nicht automatisch gegeben und muessten separat geprueft werden.
+
+Quellen: [HIP-Dokumentation zu mathematischen Funktionen](https://rocm.docs.amd.com/_/downloads/HIP/en/docs-6.3.0/),
+[HIP-Hardwarebeschreibung](https://rocm.docs.amd.com/projects/HIP/en/latest/understand/hardware_implementation.html)
+und [AMD MFMA-Builtins fuer CDNA](https://rocm-handbook.amd.com/projects/amd-rocm-optimization-guide/en/latest/compiler-builtins/cdna/mfma-builtins.html).
+
 ## GPU-Messpfade
 
 | CSV-Bezeichnung | Gemessener Umfang |

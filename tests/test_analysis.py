@@ -103,7 +103,7 @@ class AnalysisTests(unittest.TestCase):
                 run_analysis.main(['--plots', 'all', '--result-dir', str(directory),
                                    '--output-dir', str(output)])
             images = list(output.glob('*.png'))
-            self.assertEqual(len(images), 24)
+            self.assertEqual(len(images), 29)
             for image in images:
                 self.assertEqual(image.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
                 self.assertGreater(image.stat().st_size, 1000)
@@ -147,6 +147,44 @@ class AnalysisTests(unittest.TestCase):
                 plots.save_figures(directory, plots.crossover_plot(report, reports))
             self.assertTrue((directory / 'crossover_by_point_count_from_200k.png').exists())
             self.assertTrue((directory / 'crossover_hyperbola_transition.png').exists())
+            self.assertEqual(plots.pyplot().get_fignums(), [])
+
+    def test_matrix_plots_and_histogram_peaks(self):
+        self.assertEqual(calculations.histogram_peak([7]), 7)
+        self.assertEqual(calculations.histogram_peak([7, 7]), 7)
+        self.assertAlmostEqual(calculations.histogram_peak([1, 1, 61]), 1.5)
+        self.assertAlmostEqual(calculations.histogram_peak([1, 61]), 1.5)
+        with tempfile.TemporaryDirectory(prefix='analysis-matrix-') as temporary:
+            directory = Path(temporary)
+            rows = write_matrix(directory)
+            groups = data.read_matrix(directory, raw_samples=True)
+            self.assertEqual(sum(map(len, groups.values())), len(rows))
+            groups = {key: value for key, value in groups.items()
+                      if key[2] in (100000, 200000) and key[3] in (1, 2)
+                      and key[4] in (calculations.CPU, calculations.GPU)}
+            cpu_key = ('cpu', 'four-ccx', 100000, 1, calculations.CPU)
+            groups[cpu_key] = [1, 1, 61]
+            figures = plots.histogram_matrix_plot(groups)
+            name, figure = next(figures)
+            self.assertEqual(name, 'histograms_points_100000')
+            self.assertEqual(len(figure.axes), 4)
+            self.assertIn('four-ccx', figure.axes[0].get_title())
+            self.assertIn('2 Transformationen', figure.axes[2].get_ylabel())
+            self.assertEqual(figure.axes[0].lines[0].get_xdata()[0], 1.5)
+            with redirect_stdout(io.StringIO()):
+                plots.save_figures(directory, [(name, figure)])
+                plots.save_figures(directory, figures)
+            name, figure = next(plots.runtime_by_points_plot(groups))
+            self.assertEqual(name, 'runtime_by_points_four-ccx')
+            self.assertEqual(list(figure.axes[0].lines[0].get_xdata()), [100000, 200000])
+            self.assertEqual(figure.axes[0].lines[0].get_ydata()[0], 1.5)
+            self.assertEqual(figure.axes[0].get_yscale(), 'log')
+            with redirect_stdout(io.StringIO()):
+                plots.save_figures(directory, [(name, figure)])
+            images = list(directory.glob('*.png'))
+            self.assertEqual(len(images), 3)
+            for image in images:
+                self.assertEqual(image.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
             self.assertEqual(plots.pyplot().get_fignums(), [])
 
     def test_legacy_files(self):

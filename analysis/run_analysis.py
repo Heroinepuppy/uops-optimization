@@ -7,7 +7,8 @@ import calculations
 import data
 import plots
 
-PLOT_TYPES = ("comparison", "cpu-gpu", "histograms", "fits")
+PLOT_TYPES = ("comparison", "cpu-gpu", "histograms", "fits",
+              "histogram-matrix", "runtime-by-points")
 
 
 def main(argv=None):
@@ -32,8 +33,16 @@ def main(argv=None):
     selected = PLOT_TYPES if "all" in args.plots else tuple(dict.fromkeys(args.plots))
     if not args.no_plot:
         plots.pyplot()
-    values = counts = None
+    values = counts = samples = None
     for kind in selected:
+        if kind in ("histogram-matrix", "runtime-by-points"):
+            if samples is None:
+                samples = data.read_matrix(directory, raw_samples=True)
+            if not args.no_plot:
+                render = (plots.histogram_matrix_plot if kind == "histogram-matrix"
+                          else plots.runtime_by_points_plot)
+                plots.save_figures(output, render(samples))
+            continue
         if kind in ("comparison", "fits") and values is None:
             values, counts = data.load(directory, None)
         if kind == "comparison":
