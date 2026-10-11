@@ -110,11 +110,22 @@ def comparison_plot(values, counts_by_size):
         yield 'compute_combined_gpu_zoom', figure
 
 
-def cpu_gpu_plot(cpu, gpu):
+def cpu_gpu_plot(cpu, gpu, transformations=1):
     sizes = sorted({n for n, _ in cpu} | {n for n, _ in gpu})
-    figure, axes = panels(len(sizes), 'CPU / GPU - Histogramm-Peaks (60 Bins)')
+    figure, axes = panels(len(sizes),
+                          f'CPU / GPU - {transformations} Transformationen pro Punkt\n'
+                          'Single-Thread: alle Methoden; mehrere Threads: AVX2 x2\n'
+                          'Histogramm-Peaks (60 Bins)')
     stack = ('GPU kernel only', 'PCIe upload + GPU kernel',
              'PCIe upload + GPU kernel + PCIe download')
+    cache_crossings = {}
+    for ccxs, label in ((1, '1 CCX: Single / SMT / same-ccx'),
+                        (2, '2 CCX: different-ccx'), (4, '4 CCX: four-ccx')):
+        limit = ccxs * 16 * 2**20 / 24
+        for previous, current in zip(sizes, sizes[1:]):
+            if previous <= limit < current:
+                cache_crossings.setdefault(current, []).append(label)
+                break
     for axis, size in zip(axes, sizes):
         items = [('CPU: ' + method, value) for (n, method), value in cpu.items() if n == size]
         items += [(method, value) for (n, method), value in gpu.items() if n == size]
@@ -139,9 +150,17 @@ def cpu_gpu_plot(cpu, gpu):
                 axis.bar(index, value, color=METHODS.get(method, '#D55E00'))
         axis.set_xticks(range(len(items)), [label for label, _ in items], rotation=30, ha='right', fontsize=7)
         axis.set(title=f'{size:g} Punkte', ylabel='Laufzeit pro Cloud [us]')
+        if size in cache_crossings:
+            for spine in axis.spines.values():
+                spine.set_color('#D62728')
+                spine.set_linewidth(2.5)
+            axis.set_title(f'{size:g} Punkte\nL3-Kapazitaet ueberschritten: '
+                           + ', '.join(cache_crossings[size]), color='#B22222', fontsize=9)
         if components:
             axis.legend(title='Anteile aus Peak-Differenzen', fontsize=7)
-    yield 'cpu_gpu_comparison', figure
+    figure.supxlabel('Roter Rahmen: erste Punktgroesse oberhalb der theoretischen L3-Grenze; '
+                     'Ryzen 9 3950X, 16 MiB/CCX, 24 B/Punkt (Ein- + Ausgabe)', fontsize=9)
+    yield f'cpu_gpu_comparison_transforms_{transformations}', figure
 
 
 def histogram_plot(groups, stem):
@@ -236,12 +255,25 @@ def runtime_by_points_plot(samples):
                                  marker='x', color=color, zorder=4)
             axis.set_xscale('log', base=2)
             axis.set_yscale('log')
+            ccx_count = {'single': 1, 'smt': 1, 'same-ccx': 1,
+                         'different-ccx': 2, 'four-ccx': 4}.get(mode)
+            if ccx_count is not None:
+                # Documented Ryzen 9 3950X: 16 MiB L3 per CCX.
+                # Balanced partitions, input + output: 6 floats per point.
+                capacity_mib = 16 * ccx_count
+                cache_points = capacity_mib * 2**20 / 24
+                axis.axvline(cache_points, color='black', linestyle=':', linewidth=1.3,
+                             label=f'L3: {ccx_count} x 16 MiB / 24 B pro Punkt')
+                axis.annotate(f'L3-Grenze: {cache_points:,.0f} Punkte',
+                              xy=(cache_points, .98), xycoords=('data', 'axes fraction'),
+                              xytext=(4, 0), textcoords='offset points', rotation=90,
+                              va='top', fontsize=7)
             axis.set(title=f'{count} Transformationen', xlabel='Punkte pro Cloud',
                      ylabel='Laufzeit pro Cloud [us]')
             axis.grid(alpha=.2)
-        handles, legend_labels = axes[0].get_legend_handles_labels()
-        figure.legend(handles, legend_labels, loc='outside lower center', ncol=4, fontsize=8)
-        figure.supxlabel('Gesamte Transformationskette; x markiert Messungen mit nur einer Stichprobe', fontsize=9)
+            axis.legend(loc='best', fontsize=7, ncol=2)
+        figure.supxlabel('Gesamte Transformationskette; x: Einzelmessung; '
+                         'L3: theoretische Kapazitaetsgrenze (Ryzen 9 3950X, Ein- + Ausgabe)', fontsize=9)
         yield f'runtime_by_points_{mode}', figure
 
 

@@ -50,10 +50,12 @@ class AnalysisTests(unittest.TestCase):
                 self.assertTrue(all(key[-1] != 'CPU 4T / 4 CCX'
                                     for key in data.sample_groups(directory / 'benchmark_matrix.csv', 1)))
 
-    def test_no_selection_does_not_read_data(self):
+    def test_help_does_not_read_data(self):
         with patch.object(data, 'load', side_effect=AssertionError('data access')):
             with redirect_stdout(io.StringIO()):
-                run_analysis.main([])
+                with self.assertRaises(SystemExit) as exit_status:
+                    run_analysis.main(['--help'])
+                self.assertEqual(exit_status.exception.code, 0)
 
     def test_numerical_models(self):
         width, bins = calculations.histogram([2, 2, 2])
@@ -76,10 +78,10 @@ class AnalysisTests(unittest.TestCase):
             self.assertEqual([row['first_gpu_win'] for row in summary], [16, 8, 4, 2])
             output = directory / 'plots'
             with patch.object(plots, 'pyplot', side_effect=AssertionError('rendering')):
-                run_analysis.main(['--plots', 'all', '--result-dir', str(directory),
+                run_analysis.main(['--result-dir', str(directory),
                                    '--output-dir', str(output), '--no-plot'])
             self.assertEqual(list(output.glob('*.png')), [])
-            self.assertTrue((output / 'crossover_exponential_fit.json').is_file())
+            self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.json').is_file())
             self.assertEqual((directory / 'benchmark_matrix.csv').read_bytes(), before)
 
     def test_partial_or_duplicate_matrix_is_rejected(self):
@@ -102,8 +104,14 @@ class AnalysisTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 run_analysis.main(['--plots', 'all', '--result-dir', str(directory),
                                    '--output-dir', str(output)])
-            images = list(output.glob('*.png'))
-            self.assertEqual(len(images), 29)
+            images = list(output.rglob('*.png'))
+            self.assertTrue(list((output / 'hist').glob('*.png')))
+            self.assertTrue(list((output / 'hist' / 'matrix').glob('histograms_points_*.png')))
+            self.assertTrue((output / 'crossover' / 'compute_comparison.png').is_file())
+            self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.png').is_file())
+            self.assertEqual(len(images), 34)
+            self.assertEqual({p.name for p in (output / 'comparision').glob('*.png')},
+                             {f'cpu_gpu_comparison_transforms_{n}.png' for n in (1, 2, 4, 8, 16, 32)})
             for image in images:
                 self.assertEqual(image.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
                 self.assertGreater(image.stat().st_size, 1000)
@@ -179,6 +187,9 @@ class AnalysisTests(unittest.TestCase):
             self.assertEqual(list(figure.axes[0].lines[0].get_xdata()), [100000, 200000])
             self.assertEqual(figure.axes[0].lines[0].get_ydata()[0], 1.5)
             self.assertEqual(figure.axes[0].get_yscale(), 'log')
+            self.assertIsNotNone(figure.axes[0].get_legend())
+            self.assertAlmostEqual(figure.axes[0].lines[-1].get_xdata()[0],
+                                   64 * 2**20 / 24)
             with redirect_stdout(io.StringIO()):
                 plots.save_figures(directory, [(name, figure)])
             images = list(directory.glob('*.png'))

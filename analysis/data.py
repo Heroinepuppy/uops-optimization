@@ -115,13 +115,14 @@ def read_results(path):
         results[points, method] = peak
     return results
 
-def read_gpu_results(directory):
+def read_gpu_results(directory, transformations=1, matrix_records=None):
     if (directory / 'benchmark_matrix.csv').is_file():
         aliases = {'Upload + GPU': 'PCIe upload + GPU kernel',
                    'Upload + GPU + Download': 'PCIe upload + GPU kernel + PCIe download'}
         return {(size, aliases.get(method, method)): float(row['peak_us'])
-                for (device, mode, size, transforms, method), row in read_matrix(directory).items()
-                if device == 'gpu' and transforms == 1}
+                for (device, mode, size, transforms, method), row in
+                (matrix_records if matrix_records is not None else read_matrix(directory)).items()
+                if device == 'gpu' and transforms == transformations}
     paths = sorted(directory.glob('compute_gpu_*_results.csv'))
     if not paths:
         return read_results(directory / 'gpu_results.txt')
@@ -133,7 +134,7 @@ def read_gpu_results(directory):
         seen = set()
         with path.open(encoding='utf-8') as source:
             for row in csv.DictReader(source, delimiter=';'):
-                if int(row['transformations']) != 1:
+                if int(row['transformations']) != transformations:
                     continue
                 points, peak = int(row['points']), float(row['peak_us'])
                 method = aliases.get(row['method'], row['method'])
@@ -144,19 +145,25 @@ def read_gpu_results(directory):
                 seen.add((points, method))
                 results[points, method] = peak
     if not results:
-        raise ValueError('Keine GPU-Messungen mit einer Transformation vorhanden')
+        raise ValueError(f'Keine GPU-Messungen mit {transformations} Transformationen vorhanden')
     return results
 
-def read_cpu_results(directory):
+def read_cpu_results(directory, transformations=1, matrix_records=None):
     if (directory / 'benchmark_matrix.csv').is_file():
         names = {'single': '1 Thread', 'smt': '2 Threads / 1 Core SMT',
                  'same-ccx': '2 Threads / 2 Cores same CCX',
                  'different-ccx': '2 Threads / 2 Cores different CCX',
                  'four-ccx': '4 Threads / 4 Cores / 4 CCX'}
-        return {(size, names[mode]): float(row['peak_us'])
-                for (device, mode, size, transforms, method), row in read_matrix(directory).items()
-                if device == 'cpu' and transforms == 1
-                and method == f'avx2x2 / {mode}'}
+        methods = ('aos', 'soa', 'auto', 'fma', 'avx2x2', 'avx2x4', 'avx2x8')
+        records = matrix_records if matrix_records is not None else read_matrix(directory)
+        results = {}
+        for size in sorted({key[2] for key in records}):
+            for mode, name in names.items():
+                for method in methods if mode == 'single' else ('avx2x2',):
+                    key = ('cpu', mode, size, transformations, f'{method} / {mode}')
+                    if key in records:
+                        results[size, f'{method} / {name}'] = float(records[key]['peak_us'])
+        return results
     paths = sorted(directory.glob('threading_compute_cpu*_results.csv'))
     if not paths:
         return read_results(directory / 'cpu_results.txt')
@@ -168,7 +175,7 @@ def read_cpu_results(directory):
     for path in paths:
         with path.open(encoding='utf-8') as source:
             for row in csv.DictReader(source, delimiter=';'):
-                if int(row['transformations']) != 1:
+                if int(row['transformations']) != transformations:
                     continue
                 mode = canonical_method(row['method']).split(' / ')[-1]
                 key = int(row['points']), names[mode]

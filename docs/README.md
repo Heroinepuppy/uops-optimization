@@ -75,11 +75,11 @@ Der Runner schreibt nach `results/data/benchmark_matrix.csv`.
 
 `python benchmarks/run_all_benchmarks.py` ruft CPU und GPU in verschachtelten Schleifen auf:
 
-- Punktzahlen: 1, 2, 4, ... bis 33.554.432 (2^25, ca. 32M).
+- Punktzahlen: 1, 2, 4, ... bis 67.108.864 (2^26, ca. 64M).
 - Transformationen: 1, 2, 4, ... bis 1024 (2^10).
 - Je Kombination und Geraet: maximal 300 Messrunden (`--rounds 300`).
 
-Das sind 286 Punktzahl-/Transformationskombinationen und insgesamt 1716 Programmaufrufe.
+Das sind 297 Punktzahl-/Transformationskombinationen und insgesamt 1782 Programmaufrufe.
 Jede Kombination wird mit allen sieben CPU-Methoden (`aos`, `soa`, `auto`, `fma`,
 `avx2x2`, `avx2x4`, `avx2x8`) in allen fuenf Thread-Modi (`single`, `smt`,
 `same-ccx`, `different-ccx`, `four-ccx`) gemessen: 35 CPU-Varianten pro Kombination.
@@ -87,10 +87,12 @@ Je Thread-Modus laeuft ein Aufruf mit `--method all`, mit maximal 300 Messrunden
 Hinzu kommt je Kombination ein GPU-Aufruf mit den vorhandenen vier Messmodi.
 Die gemeinsame CSV enthaelt den Thread-Modus in der Spalte `thread_mode`.
 Nach der ersten vollstaendigen Runde ueber alle Methoden wird die Obergrenze einmalig
-auf `max(1, min(--rounds, floor(600 / Rundendauer_in_Sekunden)))` gesetzt.
+auf `max(1, min(--rounds, floor(max_seconds / Rundendauer_in_Sekunden)))` gesetzt.
+Der Runner setzt `--max-seconds` standardmaessig auf 300 Sekunden; direkt
+gestartete CPU-/GPU-Programme verwenden ohne diese Option 600 Sekunden.
 Die erste Runde zaehlt mit. Warm-up, Validierung und Kalibrierung zaehlen nicht
 zum Zeitbudget; interne CPU-Blockwiederholungen gehoeren zur gemessenen Rundendauer.
-Die 10 Minuten sind eine Hochrechnung, kein hartes Zeitlimit. Mindestens eine
+Das Zeitbudget ist eine Hochrechnung, kein hartes Zeitlimit. Mindestens eine
 vollstaendige Runde wird immer ausgefuehrt, auch wenn sie laenger dauert.
 Alle Ergebnisse und Rohdaten stehen in `results/data/benchmark_matrix.csv`: eine Zeile
 pro Messrunde und Methode, mit Geraet, Punktzahl, Transformationen, Laufzeit, Median
@@ -106,7 +108,7 @@ Es werden keine temporaeren Ergebnisdateien oder `.matrix_*`-Ordner angelegt.
 Der Runner startet weder Build noch Verfeinerung oder Analyse.
 `--dry-run` zeigt alle Aufrufe ohne Ausfuehrung oder Dateiaenderungen.
 Die beiden Vektoren `SIZES` und `TRANSFORMS` sowie `ROUNDS = 300` stehen fest im Skript.
-Optional: `--output-dir`.
+Optional: `--output-dir` und `--max-seconds` (ganze Sekunden von 1 bis 100000000).
 
 Vorher ueber den VS-Code-Task `Build` CPU und GPU mit CMake bauen.
 Die Build-Tasks finden CMake ueber CMAKE_COMMAND, PATH oder den vorhandenen Buildcache.
@@ -118,6 +120,7 @@ GPU-Einstellungen: `-DHIPCC_EXECUTABLE=...`, `-DLIDAR_GPU_ARCH=gfx1100`,
 python benchmarks/run_all_benchmarks.py
 python benchmarks/run_all_benchmarks.py --dry-run
 python benchmarks/run_all_benchmarks.py --pipeline-logs
+python benchmarks/run_all_benchmarks.py --max-seconds 600
 ```
 
 Der erste Befehl setzt eine vorhandene Matrix automatisch fort. `--dry-run`
@@ -182,7 +185,8 @@ Die Standarddaten liegen in `results/data/benchmark_matrix.csv` im Projekt;
 der Startordner aendert diesen Bezugspunkt nicht. Auch explizite relative
 Ein- und Ausgabepfade beziehen sich auf das Projektverzeichnis.
 
-Ohne Auswahl sowie mit `--help` werden keine Messdaten gelesen:
+Ohne Argumente werden alle sechs Analysegruppen ausgefuehrt (wie `--plots all`).
+Nur `--help` zeigt die Hilfe, ohne Messdaten zu lesen:
 
 ```powershell
 python analysis/run_analysis.py
@@ -196,20 +200,37 @@ python analysis/run_analysis.py --plots comparison
 python analysis/run_analysis.py --plots comparison cpu-gpu
 python analysis/run_analysis.py --plots histograms --device gpu --transforms 8
 python analysis/run_analysis.py --plots fits
+python analysis/run_analysis.py --plots histogram-matrix runtime-by-points
 python analysis/run_analysis.py --plots all
 ```
 
 `comparison` erzeugt Laufzeit- und Speedup-Plots, `cpu-gpu` vergleicht
-Histogramm-Peaks bei einer Transformation, `histograms` zeigt Rohdatenverteilungen
+Histogramm-Peaks fuer jede Transformationszahl der Matrix (ein Bild je Anzahl
+unter `comparision/`), `histograms` zeigt Rohdatenverteilungen
 und `fits` erzeugt die bisherigen Exponential- und Hyperbelmodelle.
 Fits brauchen mindestens vier eingegrenzte Umschlagintervalle; Modelle mit
 weiteren Parametern benoetigen entsprechend mehr Messpunkte.
 
+`histogram-matrix` erzeugt eine Histogramm-Uebersicht je Punktzahl mit bis zu
+39 Testspalten und 11 Transformationszeilen. `runtime-by-points` zeigt fuer
+jeden CPU-Thread-Modus die sieben CPU-Methoden und vier GPU-Pfade ueber die
+Punktzahlen, mit einem Subplot je Transformationszahl. Beide Gruppen lesen
+Rohsamples aus der Matrix und verwenden daraus berechnete Histogramm-Peaks.
+`--device` und `--transforms` filtern nur `histograms`.
+Details zu Darstellung, Kennzahlen und offenen Aufgaben stehen in der
+[Analyse-Dokumentation](../analysis/README.md).
+
 Eingabe: `--result-dir results/data`. Ausgabe: `--output-dir results/pics`.
-Abgeleitete CSVs und JSON-Berichte landen ebenfalls im
-Ausgabeordner. Eingabedateien werden vom neuen Einstiegspunkt nicht veraendert.
+Einzelhistogramme liegen im Unterordner `hist/`, Histogramm-Matrizen in
+`hist/matrix/` des Ausgabeordners, standardmaessig unter `results/pics/`.
+Die Crossover-Bilder aus `comparison` und `fits` sowie die JSON- und
+CSV-Berichte liegen unter `crossover/`.
+Eingabedateien werden vom neuen Einstiegspunkt nicht veraendert.
+Die Laufzeituebersichten aus `runtime-by-points` liegen unter `runtime_by_points/`.
 `--no-plot` liest und berechnet Daten und schreibt Berichte, erzeugt aber keine
 Diagramme. Matplotlib speichert PNGs ohne Fenster mit dem Agg-Backend.
+Fuer `histogram-matrix` und `runtime-by-points` prueft `--no-plot` lediglich
+die Eingabedaten; diese Gruppen schreiben keine CSV-/JSON-Berichte.
 Gnuplot wird nicht mehr verwendet; `.gp`-Skripte entfallen.
 
 Alle benoetigten Python-Pakete werden zentral in `requirements.txt` im
@@ -235,7 +256,8 @@ Vergleiche und Fits abgelehnt. Histogramme lesen die vorhandenen Rohsamples.
 
 Die bisherigen Vergleichsplots verwenden weiterhin AVX2 x2 als CPU-Referenz:
 bei Umschlaganalysen mit vier Threads auf vier CCX, beim Peak-Vergleich in den
-verschiedenen Thread-Modi. Histogramme koennen alle gespeicherten Methoden
+verschiedenen Thread-Modi. Der Peak-Vergleich `cpu-gpu` ergaenzt aus der Matrix
+ausserdem alle sieben Single-Thread-Methoden. Histogramme koennen alle gespeicherten Methoden
 zeigen. Die Auswahl beliebiger CPU-Methoden fuer Vergleichsplots ist noch
 nicht implementiert.
 
@@ -243,6 +265,19 @@ Die alten Einstiegsskripte wurden entfernt. Plots werden ausschliesslich ueber
 `run_analysis.py` ausgewaehlt. `data.merge_refinements(sources, target)` bleibt
 als Python-Funktion zum Zusammenfuehren alter Verfeinerungen verfuegbar;
 ein separates Merge-Skript gibt es nicht mehr.
+
+### Messdaten aus Git LFS laden
+
+`results/data/benchmark_matrix.csv` wird ueber Git LFS versioniert. Nach einem
+Clone muss die vollstaendige CSV lokal vorliegen, bevor die Analyse startet:
+
+```powershell
+git lfs install
+git lfs pull
+```
+
+Eine kleine Textdatei mit `version https://git-lfs.github.com/spec/v1` ist nur
+der LFS-Verweis und noch keine auswertbare CSV.
 
 <a id="tests"></a>
 

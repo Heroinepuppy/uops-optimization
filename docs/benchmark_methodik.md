@@ -48,8 +48,8 @@ Datenmenge einen gemeinsamen Cache beansprucht.
 
 ## Punktwolkengroesse und Working Set
 
-Der aktuelle Benchmark verwendet **26 Punktzahlen von `2^0` bis `2^25`**,
-also 1 bis 33.554.432 Punkte.
+Der aktuelle Benchmark verwendet **27 Punktzahlen von `2^0` bis `2^26`**,
+also 1 bis 67.108.864 Punkte.
 
 Jeder Punkt besteht aus drei 32-Bit-`float`-Werten (`x`, `y`, `z`), also
 12 Byte. Eine Punktwolke mit N Punkten hat damit `N * 12 / 1.048.576` MB
@@ -92,6 +92,7 @@ Die Anzahl der Transformationen aendert die Punktzahl und diese Nutzdatengroesse
 | 2^23   |  8.388.608 |            96,000000 |             192,000000 |
 | 2^24   | 16.777.216 |           192,000000 |             384,000000 |
 | 2^25   | 33.554.432 |           384,000000 |             768,000000 |
+| 2^26   | 67.108.864 |           768,000000 |            1536,000000 |
 
 Ein L3-Cache mit 16 MB entspricht 16.777.216 Byte. Das gesamte
 Ein-/Ausgabe-Working-Set liegt bei `2^19` Punkten darunter und bei `2^20`
@@ -108,10 +109,12 @@ Diese internen Wiederholungen sind keine zusaetzlichen Messrunden.
 
 Bei `--method all` wird die Reihenfolge der sieben CPU-Methoden je Runde gemischt.
 Eine GPU-Runde misst alle vier GPU-Pfade. Nach der ersten vollstaendigen Runde
-wird einmalig `max(1, min(--rounds, floor(600 / Rundendauer_in_Sekunden)))`
-als Rundenobergrenze gesetzt. Die erste Runde zaehlt mit; Vorbereitung und
+wird einmalig `max(1, min(--rounds, floor(max_seconds / Rundendauer_in_Sekunden)))`
+als Rundenobergrenze gesetzt. `--max-seconds` ist konfigurierbar: Der Runner
+verwendet standardmaessig 300 Sekunden, die direkt gestarteten Programme 600.
+Die erste Runde zaehlt mit; Vorbereitung und
 Kalibrierung sind nicht Teil dieser Hochrechnung. Schwankungen oder eine einzelne
-lange Runde koennen die geschaetzten zehn Minuten ueberschreiten.
+lange Runde koennen das geschaetzte Zeitbudget ueberschreiten.
 
 ## GPU-Arithmetik: FMA und Matrix-Anweisungen
 
@@ -179,10 +182,19 @@ bezieht sich auf die gesamte Punktwolke, nicht auf einen einzelnen Punkt.
 
 Der Peak ist der Mittelpunkt des am staerksten besetzten von 60 gleich breiten
 Histogramm-Bins. Er haengt von der Verteilung und der Bin-Einteilung ab.
-Die Analyse `cpu-gpu` vergleicht Peaks bei einer Transformation;
+Die Analyse `cpu-gpu` vergleicht Peaks getrennt fuer jede Transformationszahl der Matrix;
 `comparison` und die Umschlag-Fits verwenden die gespeicherten Mediane.
 Histogramme zeigen die Rohdatenverteilungen. Bei wenigen Runden ist ihre
 Aussagekraft entsprechend begrenzt.
+
+Die neuen Gruppen `histogram-matrix` und `runtime-by-points` berechnen den
+Peak direkt aus den Rohsamples `us`, statt die gespeicherte Spalte `peak_us`
+zu verwenden. Bei gleich stark besetzten Bins gewinnt der mit der kleineren
+Laufzeit; konstante Reihen und Einzelmessungen behalten ihren exakten Wert.
+Die Laufzeit gilt fuer die gesamte Transformationskette einer Punktwolke,
+ohne Division durch Punkt- oder Transformationszahl. Einzelmessungen sind
+in den Laufzeitkurven mit einem Kreuz markiert. Details und Aufruf stehen
+in der [Analyse-Dokumentation](../analysis/README.md).
 
 Eine Umschlaggrenze wird aus gemessenen Bereichen abgeleitet. Modellkurven und
 Fits sind von beobachteten Ergebnissen zu unterscheiden; ausserhalb des
