@@ -289,7 +289,9 @@ def boundary_axis(axis, records):
                      facecolors='none', edgecolors='red', s=100, label='Mehrfache Gewinnerwechsel')
     axis.set_xscale('log', base=10)
     axis.set(xlabel='Punkte pro Cloud [Millionen]', ylabel='Transformationen pro Punkt')
-    axis.set_ylim(bottom=0)
+    axis.set_yscale('log')
+    axis.set_ylim(.9 * min(r['lower'] for r in records),
+                  1.1 * max(r['upper'] for r in records))
     # Historical hardware reference: four workers, XYZ input/output = 24 B/point.
     for name, capacity in [('L1', 4*32*1024), ('L2', 4*512*1024), ('L3', 4*16*1024*1024)]:
         location = capacity / 24 / 1e6
@@ -317,9 +319,10 @@ def plot_boundary_model(axis, records, evaluate):
         axis.plot(extension, [evaluate(x) for x in extension], color='red',
                   linestyle='--', label='Extrapolation bis 1 Punkt (nicht nachgewiesen)')
         axis.axvspan(1e-6, lower, color='gray', alpha=.1)
-    axis.set_yscale('symlog', linthresh=1)
-    axis.set_ylim(bottom=0)
-    axis.set_ylabel('Transformationen pro Punkt (logarithmisch ab 1)')
+    axis.set_yscale('log')
+    axis.set_ylim(.9 * min(r['lower'] for r in records),
+                  1.1 * max(r['upper'] for r in records))
+    axis.set_ylabel('Transformationen pro Punkt (logarithmisch)')
     axis.legend(fontsize=7)
 
 

@@ -39,8 +39,12 @@ Die Fits der Transformationsgrenze ueber der Punktzahl werden bis zu einem
 Punkt extrapoliert. Gestrichelte Kurven und grauer Hintergrund kennzeichnen
 den Bereich unterhalb der kleinsten fuer den jeweiligen Fit verwendeten
 Punktzahl. Die Fitparameter werden weiterhin nur aus eingegrenzten
-Umschlagintervallen berechnet. Die Y-Achse ist oberhalb einer Transformation
-logarithmisch. Die Bildunterschrift nennt den ersten eingegrenzten GPU-Gewinn
+Umschlagintervallen berechnet. Die Y-Achse ist logarithmisch und reicht von
+90 % der kleinsten unteren Messintervallgrenze bis 110 % der groessten oberen
+Messintervallgrenze. Extrapolierte Werte bestimmen die Achsengrenzen nicht.
+Unbeschraenkte Fits koennen ausserhalb des Messbereichs unphysikalische
+negative Werte liefern, die logarithmisch nicht darstellbar sind.
+Die Bildunterschrift nennt den ersten eingegrenzten GPU-Gewinn
 und weist darauf hin, dass fuer kleinere Punktwolken kein Uebergang belegt ist.
 `cpu-gpu` erzeugt fuer jede in der Matrix vorhandene Transformationszahl
 ein Bild `comparision/cpu_gpu_comparison_transforms_<Anzahl>.png`.
