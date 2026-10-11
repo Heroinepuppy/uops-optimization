@@ -2,7 +2,7 @@
 
 import math
 
-from calculations import CPU, GPU, exponential, grid, histogram, histogram_peak, stepped
+from calculations import CPU, GPU, exponential, exponential_spline, grid, histogram, histogram_peak, stepped
 
 METHODS = {CPU: '#D55E00', 'GPU kernel only': '#56B4E9',
            'GPU resident (host sync)': '#009E73', 'Upload + GPU': '#8C564B',
@@ -355,13 +355,26 @@ def crossover_plot(report, reports):
         boundary_axis(axis, selected)
         if 'd1' in model:
             stepped_model = dict(model, transitions=[dict(d=model['d1'], N=model['N1'], w=model['w1'])])
-        if 'fit' in model:
+        if 'segments' in model:
+            evaluate = lambda x: exponential_spline(model, x)
+        elif 'fit' in model:
             evaluate = lambda x: exponential(model['fit'], x)
         elif 'd1' in model:
             evaluate = lambda x: stepped(stepped_model, x)
         else:
             evaluate = lambda x: stepped(model, x)
         plot_boundary_model(axis, selected, evaluate)
+        if 'segments' in model:
+            for left, right in zip(model['segments'], model['segments'][1:]):
+                bridge = grid(left['end'], right['start'], True)
+                axis.plot(bridge, [evaluate(x) for x in bridge], color='#0072B2', linewidth=2,
+                          label='Spline-Uebergang' if left is model['segments'][0] else None)
+            notes = [f"{s['region']}: n={s['count']}, RMSE={s['rmse_transformations']:.2g}, "
+                     + ('im Messintervall' if s['within_intervals'] else 'ausserhalb Messintervall')
+                     + ('; zu wenige Punkte' if s['status'] != 'fit' else '') for s in model['segments']]
+            notes += [f'{region}: keine Fitpunkte' for region in model['unsupported_regions']]
+            axis.text(.98, .97, '\n'.join(notes), transform=axis.transAxes,
+                      ha='right', va='top', fontsize=8)
         axis.set_title(model['model'])
         axis.legend()
         figure.supxlabel(describe(model) + '\n' + evidence, fontsize=8)

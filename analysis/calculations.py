@@ -284,7 +284,8 @@ def crossover_fit_report(values, counts, all_rows, has_refinements=False):
 def fit_reports(records):
     ordered = sorted(records, key=lambda row: row['points'])
     points = [(row['points'] / 1e6, row['x']) for row in ordered]
-    reports = {'crossover_hyperbola_fit': hyperbola_fit(points)}
+    reports = {'crossover_hyperbola_fit': hyperbola_fit(points),
+               'crossover_exponential_spline_fit': exponential_spline_fit(ordered)}
     if len(records) >= 6:
         reports['crossover_hyperbola_transition_fit'] = transition_fit(points)
     reports['crossover_hyperbola_models'] = dict(
@@ -313,6 +314,58 @@ def grid(low, high, logarithmic=False):
     if logarithmic:
         return [math.exp(math.log(low) + i * math.log(high / low) / 499) for i in range(500)]
     return [low + i * (high - low) / 499 for i in range(500)]
+
+
+def exponential_spline_fit(records):
+    """Exponential sections split at documented four-core cache capacities."""
+    records = sorted(records, key=lambda row: row['points'])
+    boundaries = [4 * capacity / 24 / 1e6 for capacity in (32*1024, 512*1024, 16*1024*1024)]
+    segments, unsupported = [], []
+    edges = [0, *boundaries, float('inf')]
+    for index, name in enumerate(('L1', 'L2', 'L3', 'RAM')):
+        rows = [r for r in records if edges[index] < r['points']/1e6 <= edges[index+1]]
+        if not rows:
+            unsupported.append(name)
+            continue
+        xs = [r['points']/1e6 for r in rows]
+        ys = [math.log(r['x']) for r in rows]
+        xm, ym = sum(xs)/len(xs), sum(ys)/len(ys)
+        denominator = sum((x-xm)**2 for x in xs)
+        slope = min(0., sum((x-xm)*(y-ym) for x,y in zip(xs,ys))/denominator) if denominator else 0.
+        log_a = ym + slope*(xs[0]-xm)
+        predicted = [math.exp(log_a+slope*(x-xs[0])) for x in xs]
+        segments.append(dict(region=name, start=xs[0], end=xs[-1], log_a=log_a,
+                             b=-slope, count=len(rows),
+                             status='fit' if len(rows)>=3 else 'insufficient_points',
+                             within_intervals=all(r['lower']<=y<=r['upper'] for r,y in zip(rows,predicted)),
+                             rmse_transformations=math.sqrt(sum((y-r['x'])**2 for r,y in zip(rows,predicted))/len(rows))))
+    return dict(model='Cache sections: exponential fits with cubic Hermite bridges',
+                N_unit='million points', K_unit='transformations per point',
+                objective='Least squares in log K; b >= 0; fixed L1/L2/L3 regions',
+                caveat='Fewer than 3 points: provisional constant or two-point curve. '
+                       'Bridges match value and slope in log N/log K; brackets are not confidence intervals.',
+                cache_boundaries=boundaries, unsupported_regions=unsupported, segments=segments)
+
+
+def exponential_spline(model, n):
+    segments = model['segments']
+    def value(segment, x):
+        return segment['log_a'] - segment['b'] * (x - segment['start'])
+    if n <= segments[0]['start']:
+        return math.exp(min(700, value(segments[0], n)))
+    for index, segment in enumerate(segments):
+        if n <= segment['end'] or index == len(segments) - 1:
+            return math.exp(max(-700, min(700, value(segment, n))))
+        right = segments[index + 1]
+        if n < right['start']:
+            left_n, right_n = segment['end'], right['start']
+            width = math.log(right_n / left_n)
+            t = math.log(n / left_n) / width
+            y = ((2*t**3-3*t*t+1)*value(segment,left_n)
+                 +(t**3-2*t*t+t)*width*(-segment['b']*left_n)
+                 +(-2*t**3+3*t*t)*value(right,right_n)
+                 +(t**3-t*t)*width*(-right['b']*right_n))
+            return math.exp(max(-700, min(700, y)))
 
 
 def exponential(model, x):

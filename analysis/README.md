@@ -35,6 +35,19 @@ und `--output-dir` lassen sich die Verzeichnisse einstellen.
 Die Bilder aus `comparison` (Laufzeit-/Speedup-Vergleiche ueber die
 Transformationszahl) und `fits` liegen in `results/pics/crossover/`.
 Crossover-JSON- und CSV-Berichte liegen ebenfalls in `crossover/`.
+Zusaetzlich bleiben die Hyperbelmodelle erhalten und `fits` erzeugt
+`crossover_exponential_spline.png` sowie `crossover_exponential_spline_fit.json`.
+Dieses Modell teilt an den theoretischen L1-/L2-/L3-Grenzen fuer vier Kerne
+auf vier CCX (32 KiB L1-Daten, 512 KiB L2 pro Kern, 16 MiB L3 pro CCX;
+24 Byte Ein-/Ausgabe pro Punkt). Je belegtem Bereich wird
+`a * exp(-b * (N-N0))` mit `b >= 0` durch kleinste Quadrate in `log(K)` angepasst.
+Zwischen dem letzten Messpunkt eines Bereichs und dem ersten des naechsten
+verbindet ein blauer kubischer Hermite-Spline die Werte und Steigungen in
+`log(N)`/`log(K)`. Das ist eine glatte Verbindung, kein zusaetzlicher Messnachweis.
+RMSE und Lage innerhalb/ausserhalb der Messintervalle stehen im Plot/JSON.
+Bereiche mit weniger als drei Punkten sind als unzureichend belegt markiert
+(ein Punkt: konstante Hilfskurve; zwei Punkte: vorlaeufige Anpassung).
+Leere Bereiche erhalten keinen eigenen Fit. Die Hyperbel-Plots werden nicht ersetzt.
 Die Fits der Transformationsgrenze ueber der Punktzahl werden bis zu einem
 Punkt extrapoliert. Gestrichelte Kurven und grauer Hintergrund kennzeichnen
 den Bereich unterhalb der kleinsten fuer den jeweiligen Fit verwendeten

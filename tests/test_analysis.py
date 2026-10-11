@@ -67,6 +67,21 @@ class AnalysisTests(unittest.TestCase):
         result = calculations.fit([(x, 2 + 5 * math.exp(-.4 * x)) for x in range(6)], True)
         self.assertLess(result['rmse_us'], 1e-6)
 
+    def test_exponential_spline_joins(self):
+        records = [dict(points=n, x=100*math.exp(-n/1e6),
+                        lower=1, upper=200) for n in (8192, 16384, 32768, 131072, 262144, 524288)]
+        model = calculations.exponential_spline_fit(records)
+        self.assertEqual(model['unsupported_regions'], ['L1', 'RAM'])
+        self.assertEqual([s['region'] for s in model['segments']], ['L2', 'L3'])
+        for segment in model['segments']:
+            for x in (segment['start'], segment['end']):
+                self.assertAlmostEqual(calculations.exponential_spline(model, x),
+                                       100*math.exp(-x), places=6)
+                h = x * 1e-5
+                left = (calculations.exponential_spline(model,x)-calculations.exponential_spline(model,x-h))/h
+                right = (calculations.exponential_spline(model,x+h)-calculations.exponential_spline(model,x))/h
+                self.assertAlmostEqual(left, right, delta=.01)
+
     def test_all_plots_from_synthetic_matrix(self):
         with tempfile.TemporaryDirectory(prefix='analysis-test-') as temporary:
             directory = Path(temporary)
@@ -109,7 +124,7 @@ class AnalysisTests(unittest.TestCase):
             self.assertTrue(list((output / 'hist' / 'matrix').glob('histograms_points_*.png')))
             self.assertTrue((output / 'crossover' / 'compute_comparison.png').is_file())
             self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.png').is_file())
-            self.assertEqual(len(images), 34)
+            self.assertEqual(len(images), 35)
             self.assertEqual({p.name for p in (output / 'comparision').glob('*.png')},
                              {f'cpu_gpu_comparison_transforms_{n}.png' for n in (1, 2, 4, 8, 16, 32)})
             for image in images:
