@@ -306,8 +306,30 @@ def describe(model):
     return text + '\nEmpirischer Fit an Intervallmitten; keine exakte Entscheidungsgrenze.'
 
 
+def plot_boundary_model(axis, records, evaluate):
+    """Separate the fitted domain from extrapolation down to one point."""
+    lower = records[0]['points'] / 1e6
+    upper = records[-1]['points'] / 1e6
+    curve = grid(lower, upper, True)
+    axis.plot(curve, [evaluate(x) for x in curve], color='red', label='Fit an Intervallmitten')
+    if lower > 1e-6:
+        extension = grid(1e-6, lower, True)
+        axis.plot(extension, [evaluate(x) for x in extension], color='red',
+                  linestyle='--', label='Extrapolation bis 1 Punkt (nicht nachgewiesen)')
+        axis.axvspan(1e-6, lower, color='gray', alpha=.1)
+    axis.set_yscale('symlog', linthresh=1)
+    axis.set_ylim(bottom=0)
+    axis.set_ylabel('Transformationen pro Punkt (logarithmisch ab 1)')
+    axis.legend(fontsize=7)
+
+
 def crossover_plot(report, reports):
     records = sorted(report['points'], key=lambda r: r['points'])
+    first = records[0]
+    evidence = (f"Erster eingegrenzter GPU-Gewinn: {first['points']:,} Punkte, "
+                f"{first['upper']} Transformationen (CPU: AVX2 x2 / 4 CCX; GPU inkl. Transfers).\n"
+                'Fuer kleinere Punktwolken ist damit kein Uebergang nachgewiesen; '
+                'ob die GPU dort jemals schneller wird, bleibt offen.')
     figure, axis = pyplot().subplots(figsize=(12, 8), layout='constrained')
     xs = [r['x'] for r in records]
     curve = grid(min(xs), max(xs))
@@ -326,33 +348,33 @@ def crossover_plot(report, reports):
         if key == 'crossover_hyperbola_models':
             continue
         selected = [r for r in records if r['points'] >= model.get('minimum_points', 0)]
-        curve = grid(selected[0]['points'] / 1e6, selected[-1]['points'] / 1e6, True)
         figure, axis = pyplot().subplots(figsize=(12, 8), layout='constrained')
         boundary_axis(axis, selected)
-        if 'fit' in model:
-            ys = [exponential(model['fit'], x) for x in curve]
-        elif 'd1' in model:
+        if 'd1' in model:
             stepped_model = dict(model, transitions=[dict(d=model['d1'], N=model['N1'], w=model['w1'])])
-            ys = [stepped(stepped_model, x) for x in curve]
+        if 'fit' in model:
+            evaluate = lambda x: exponential(model['fit'], x)
+        elif 'd1' in model:
+            evaluate = lambda x: stepped(stepped_model, x)
         else:
-            ys = [stepped(model, x) for x in curve]
-        axis.plot(curve, ys, color='red', label='Fit')
+            evaluate = lambda x: stepped(model, x)
+        plot_boundary_model(axis, selected, evaluate)
         axis.set_title(model['model'])
         axis.legend()
-        figure.supxlabel(describe(model), fontsize=8)
+        figure.supxlabel(describe(model) + '\n' + evidence, fontsize=8)
         yield key.removesuffix('_fit'), figure
     models = reports['crossover_hyperbola_models']['models']
     figure, axes = pyplot().subplots(3, 2, figsize=(16, 15), layout='constrained')
-    curve = grid(records[0]['points'] / 1e6, records[-1]['points'] / 1e6, True)
     for axis, model in zip(axes.flat, models):
         boundary_axis(axis, records)
         axis.set_title(f"Hyperbel mit {model['m']} Uebergaengen")
         if model['status'] == 'ok':
-            axis.plot(curve, [stepped(model, x) for x in curve], color='red', label='Fit')
+            plot_boundary_model(axis, records, lambda x: stepped(model, x))
             details = describe(model)
             for step in model['transitions']:
                 details += f"\nN={step['N']:.4g}, w={step['w']:.4g}, d={step['d']:.4g}"
             axis.text(.03, .97, details, va='top', transform=axis.transAxes, fontsize=7, wrap=True)
         else:
             axis.text(.05, .9, 'Zu wenige Messpunkte oder singulaerer Fit', transform=axis.transAxes)
+    figure.supxlabel(evidence + '\nGestrichelt / grau: Extrapolation, keine gemessene Entscheidungsgrenze.', fontsize=8)
     yield 'crossover_hyperbola_comparison', figure

@@ -35,6 +35,13 @@ und `--output-dir` lassen sich die Verzeichnisse einstellen.
 Die Bilder aus `comparison` (Laufzeit-/Speedup-Vergleiche ueber die
 Transformationszahl) und `fits` liegen in `results/pics/crossover/`.
 Crossover-JSON- und CSV-Berichte liegen ebenfalls in `crossover/`.
+Die Fits der Transformationsgrenze ueber der Punktzahl werden bis zu einem
+Punkt extrapoliert. Gestrichelte Kurven und grauer Hintergrund kennzeichnen
+den Bereich unterhalb der kleinsten fuer den jeweiligen Fit verwendeten
+Punktzahl. Die Fitparameter werden weiterhin nur aus eingegrenzten
+Umschlagintervallen berechnet. Die Y-Achse ist oberhalb einer Transformation
+logarithmisch. Die Bildunterschrift nennt den ersten eingegrenzten GPU-Gewinn
+und weist darauf hin, dass fuer kleinere Punktwolken kein Uebergang belegt ist.
 `cpu-gpu` erzeugt fuer jede in der Matrix vorhandene Transformationszahl
 ein Bild `comparision/cpu_gpu_comparison_transforms_<Anzahl>.png`.
 Jedes Bild zeigt alle sieben Single-Thread-Methoden
