@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+from hardware_info import detect, format_info
 
 # All commands and output paths are relative to the project directory.
 ROOT = Path('.')
@@ -248,6 +249,7 @@ def main(argv=None):
     if not 1 <= args.max_seconds <= 100000000:
         parser.error('--max-seconds must be in 1..100000000')
     directory = Path(os.path.relpath(args.output_dir))
+    print(format_info(detect()), flush=True)
     total = len(SIZES) * len(TRANSFORMS) * (len(CPU_THREAD_MODES) + 1)
     print(f'Matrix: {len(SIZES)} Punktgroessen x {len(TRANSFORMS)} Transformationszahlen '
           f'x ({len(CPU_THREAD_MODES)} CPU-Thread-Modi mit allen {len(CPU_METHODS)} Methoden + GPU) '

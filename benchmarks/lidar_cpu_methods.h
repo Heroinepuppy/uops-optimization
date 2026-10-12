@@ -10,7 +10,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#else
 #include <immintrin.h>
+#endif
 #include <iostream>
 #include <memory>
 #include <numeric>
@@ -21,9 +25,15 @@
 #include <thread>
 #include <vector>
 
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#else
+#include <pthread.h>
+#include <sched.h>
+#include <unistd.h>
+#endif
 
 struct Transform {
     float r00, r01, r02;
@@ -43,12 +53,20 @@ struct SoA {
 volatile float g_sink = 0.0f;
 
 static void pin_this_thread_to_cpu(unsigned logical_cpu) {
+#if defined(_WIN32)
     const DWORD_PTR mask = (DWORD_PTR{1} << logical_cpu);
     if (SetThreadAffinityMask(GetCurrentThread(), mask) == 0) {
         std::cerr << "WARNUNG: CPU-Affinitaet fuer CPU "
                   << logical_cpu << " konnte nicht gesetzt werden.\n";
     }
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+#else
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(logical_cpu, &mask);
+    if (pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask) != 0)
+        std::cerr << "WARNUNG: CPU-Affinitaet konnte fuer CPU " << logical_cpu << " nicht gesetzt werden.\n";
+#endif
 }
 
 __declspec(noinline)
