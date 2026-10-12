@@ -4,6 +4,9 @@ import io
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'benchmarks'))
 import run_all_benchmarks as runner
@@ -71,6 +74,49 @@ class ResumeTests(unittest.TestCase):
             if change == 'method': rows[-1]['method'] = 'unknown'
             with self.subTest(change=change), self.assertRaises(ValueError):
                 runner.resume_position(io.BytesIO(self.encode(rows)), self.commands)
+
+
+class NativeMatrixTests(unittest.TestCase):
+    def setUp(self):
+        self.profile = dict(cpu_exe='build/bin/ARMv8/lidar_compute_cpu', gpu_exe=None,
+                            methods=['aos', 'soa', 'auto', 'neon', 'neonx2', 'neonx4', 'neonx8'],
+                            thread_modes=['single', 'two-core', 'four-core'], cpu=0)
+        self.commands = list(runner.matrix_commands([1], [1], 300, Path('build/test-results'),
+                                                   profile=self.profile))
+
+    def test_arm_matrix_uses_only_supported_devices_and_modes(self):
+        self.assertEqual(len(self.commands), 3)
+        self.assertEqual([c[c.index('--thread-mode') + 1] for c in self.commands],
+                         ['single', 'two-core', 'four-core'])
+        command = self.commands[0]
+        self.assertEqual(command[0], self.profile['cpu_exe'])
+        self.assertEqual(command[command.index('--thread-mode') + 1], 'single')
+        self.assertEqual(command[command.index('--cpu') + 1], '0')
+
+    def test_arm_resume_and_foreign_methods(self):
+        rows = [dict(device='cpu', thread_mode=mode, points=1, transformations=1,
+                     method=f'{method} / {mode}', sample=0, us=1, median_us=1,
+                     peak_us=1, samples=1, us_per_transform=1, invalid_samples=0)
+                for mode in self.profile['thread_modes'] for method in self.profile['methods']]
+        encoded = self.encode(rows)
+        self.assertEqual(runner.resume_position(io.BytesIO(encoded), self.commands, self.profile),
+                         (3, len(encoded)))
+        self.assertEqual(runner.resume_position(io.BytesIO(self.encode(rows[:-1])),
+                                               self.commands, self.profile)[0], 2)
+        rows[-1]['method'] = 'avx2x8 / single'
+        with self.assertRaises(ValueError):
+            runner.resume_position(io.BytesIO(self.encode(rows)), self.commands, self.profile)
+
+    def test_arm_discovery_queries_native_build(self):
+        info = SimpleNamespace(architecture='aarch64')
+        capabilities = json.dumps({key: self.profile[key] for key in ('methods', 'thread_modes', 'cpu')})
+        with patch.object(Path, 'is_file', lambda path: str(path) == self.profile['cpu_exe']), \
+                patch.object(runner.subprocess, 'run', return_value=SimpleNamespace(stdout=capabilities)) as query:
+            selected = runner.select_profile(info)
+        self.assertEqual(selected, self.profile)
+        self.assertEqual(query.call_args.args[0], [self.profile['cpu_exe'], '--capabilities'])
+
+    encode = ResumeTests.encode
 
 
 if __name__ == '__main__':

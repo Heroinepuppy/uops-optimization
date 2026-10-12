@@ -4,6 +4,7 @@ from contextlib import nullcontext
 import csv
 import os
 import math
+import json
 import re
 from pathlib import Path
 import shutil
@@ -24,7 +25,7 @@ RESULT_FIELDS = ['device', 'thread_mode', 'points', 'transformations', 'method',
                  'median_us', 'peak_us', 'samples', 'us_per_transform', 'invalid_samples']
 
 
-def matrix_commands(sizes, counts, rounds, directory, max_seconds=600):
+def matrix_commands(sizes, counts, rounds, directory, max_seconds=600, profile=None):
     """Yield CPU and GPU commands for each combination of matrix parameters.
 
     Args:
@@ -36,18 +37,25 @@ def matrix_commands(sizes, counts, rounds, directory, max_seconds=600):
         rounds: Positive maximum sample count per method; configured as 300.
         directory: pathlib.Path to any valid output directory containing the
             shared results CSV, normally relative to the project root.
+        profile: Optional dictionary from select_profile containing native
+            executable paths, methods, supported thread modes and base CPU;
+            None uses the legacy x86/GPU matrix for compatibility.
         max_seconds: Integer estimated time budget per measurement block in
             seconds, in 1..100000000; defaults to 600. Not a hard timeout.
     """
+    profile = profile or dict(cpu_exe=CPU_EXE, gpu_exe=GPU_EXE,
+                              methods=CPU_METHODS, thread_modes=CPU_THREAD_MODES)
     for points in sizes:
         for transforms in counts:
             common = ['--points', str(points), '--transforms', str(transforms),
                       '--rounds', str(rounds), '--max-seconds', str(max_seconds),
                       '--output-file', str(directory / 'benchmark_matrix.csv')]
-            for mode in CPU_THREAD_MODES:
+            for mode in profile['thread_modes']:
                 # The CPU executable measures all seven methods in shuffled order.
-                yield [CPU_EXE, *common, '--method', 'all', '--thread-mode', mode]
-            yield [GPU_EXE, *common]
+                cpu_args = ['--cpu', str(profile['cpu'])] if 'cpu' in profile else []
+                yield [profile['cpu_exe'], *common, '--method', 'all', '--thread-mode', mode, *cpu_args]
+            if profile['gpu_exe']:
+                yield [profile['gpu_exe'], *common]
 
 
 
@@ -65,16 +73,18 @@ def format_output(line):
     return line
 
 
-def resume_position(source, commands):
+def resume_position(source, commands, profile=None):
     """Read sequential CSV blocks; return completed calls and safe byte boundary.
 
     Args:
+        profile: Optional native capability dictionary; None uses x86 methods.
         source: Readable binary stream with readline(), read(), and tell(),
             positioned at byte zero; accepts an empty file or a UTF-8 CSV
             with RESULT_FIELDS as its semicolon-separated header.
         commands: Sized, ordered sequence of argument lists from matrix_commands,
             possibly empty; each list describes one expected CSV block.
     """
+    cpu_methods = profile['methods'] if profile else CPU_METHODS
     header = source.readline()
     if not header:
         return 0, 0
@@ -93,10 +103,10 @@ def resume_position(source, commands):
                     transformation count.
             """
             return command[command.index(name) + 1]
-        cpu = command[0] == CPU_EXE
+        cpu = '--thread-mode' in command
         device = 'cpu' if cpu else 'gpu'
         mode = arg('--thread-mode') if cpu else ''
-        methods = ({f'{m} / {mode}' for m in CPU_METHODS} if cpu else
+        methods = ({f'{m} / {mode}' for m in cpu_methods} if cpu else
                    {'GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download'})
         max_rounds = int(arg('--rounds'))
         rounds = None
@@ -222,6 +232,34 @@ class Runner:
         print('\n')
 
 
+def select_profile(info):
+    """Discover a native CPU build and query supported benchmark methods/modes.
+
+    Args:
+        info: HardwareInfo for the local host; ARM64 prefers the ARMv8 build.
+    Returns:
+        Dictionary with executable paths, method/mode lists and base CPU.
+        GPU is None when no built HIP executable is present.
+    """
+    arm = info.architecture.lower() in ('aarch64', 'arm64')
+    suffix = '.exe' if os.name == 'nt' else ''
+    cpu_candidates = ([f'build/bin/ARMv8/lidar_compute_cpu{suffix}'] if arm else [])
+    cpu_candidates += [f'build/bin/lidar_compute_cpu{suffix}', CPU_EXE]
+    cpu_exe = next((p for p in cpu_candidates if Path(p).is_file()), None)
+    if cpu_exe is None:
+        raise FileNotFoundError('CPU benchmark missing. Run Build ARMv8 on the Pi or Build CPU first.')
+    query = subprocess.run([cpu_exe, '--capabilities'], check=True, capture_output=True,
+                           text=True, timeout=10)
+    capabilities = json.loads(query.stdout)
+    required = {'aos', 'soa', 'auto', 'neon', 'neonx2', 'neonx4', 'neonx8'} if arm else set(CPU_METHODS)
+    if set(capabilities['methods']) != required or 'single' not in capabilities['thread_modes']:
+        raise ValueError('CPU executable capabilities do not match the host architecture; rebuild it.')
+    gpu_candidates = [f'build/bin/lidar_compute_gpu{suffix}', GPU_EXE]
+    gpu_exe = None if arm else next((p for p in gpu_candidates if Path(p).is_file()), None)
+    return dict(cpu_exe=cpu_exe, gpu_exe=gpu_exe, methods=capabilities['methods'],
+                thread_modes=capabilities['thread_modes'], cpu=capabilities['cpu'])
+
+
 def main(argv=None):
     """Parse options and run or resume the benchmark matrix in CSV order.
 
@@ -232,9 +270,10 @@ def main(argv=None):
             '--pipeline-logs' saves raw output per call (disabled by default);
             '--restart' starts over instead of resuming existing results;
             '--max-seconds N' sets the estimated time budget per measurement
-            block in whole seconds, in 1..100000000 (default: 600);
+            block in whole seconds, in 1..100000000 (default: 300);
             '--output-dir PATH' selects any valid output directory (default:
-            'results/data'); '-h' or '--help' prints help and exits.
+            'results/data/armv8' on ARM64, otherwise 'results/data');
+            '-h' or '--help' prints help and exits.
     """
     # Resolve relative executable and output paths from the project directory.
     os.chdir(Path(__file__).resolve().parent.parent)
@@ -242,20 +281,33 @@ def main(argv=None):
     parser.add_argument('--dry-run', action='store_true', help='Show commands without writes or execution')
     parser.add_argument('--pipeline-logs', action='store_true', help='Write per-step pipeline log files (disabled by default)')
     parser.add_argument('--restart', action='store_true', help='Discard existing results and start from the beginning')
-    parser.add_argument('--output-dir', type=Path, default=Path('results/data'))
+    parser.add_argument('--output-dir', type=Path, help='Output directory (ARM64: results/data/armv8; x86: results/data)')
     parser.add_argument('--max-seconds', type=int, default=300,
-                        help='Estimated seconds per measurement block (default: 600); not a hard timeout')
+                        help='Estimated seconds per measurement block (default: 300); not a hard timeout')
     args = parser.parse_args(argv)
     if not 1 <= args.max_seconds <= 100000000:
         parser.error('--max-seconds must be in 1..100000000')
-    directory = Path(os.path.relpath(args.output_dir))
-    print(format_info(detect()), flush=True)
-    total = len(SIZES) * len(TRANSFORMS) * (len(CPU_THREAD_MODES) + 1)
-    print(f'Matrix: {len(SIZES)} Punktgroessen x {len(TRANSFORMS)} Transformationszahlen '
-          f'x ({len(CPU_THREAD_MODES)} CPU-Thread-Modi mit allen {len(CPU_METHODS)} Methoden + GPU) '
-          f'= {total} Aufrufe, jeweils maximal {ROUNDS} Messrunden pro Methode '
-          f'({args.max_seconds} s Hochrechnung nach der ersten Runde).', flush=True)
-    commands = list(matrix_commands(SIZES, TRANSFORMS, ROUNDS, directory, args.max_seconds))
+    info = detect()
+    print(format_info(info), flush=True)
+    try:
+        profile = select_profile(info)
+        # A built HIP executable may have no usable runtime/device on this host.
+        if profile['gpu_exe'] and not args.dry_run:
+            probe = subprocess.run([profile['gpu_exe'], '--points', '1', '--transforms', '1',
+                                    '--verify-only'], capture_output=True, text=True, timeout=30)
+            if probe.returncode:
+                print('HIP GPU unavailable; running CPU benchmarks only.', flush=True)
+                profile['gpu_exe'] = None
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
+        raise SystemExit(f'Benchmark discovery failed: {exc}') from exc
+    arm = info.architecture.lower() in ('aarch64', 'arm64')
+    directory = Path(os.path.relpath(args.output_dir or Path('results/data/armv8' if arm else 'results/data')))
+    print(f"CPU executable: {profile['cpu_exe']}", flush=True)
+    print(f"Methods: {', '.join(profile['methods'])}; thread modes: {', '.join(profile['thread_modes'])}", flush=True)
+    print(f"GPU executable: {profile['gpu_exe'] or 'disabled'}; results: {directory}", flush=True)
+    total = len(SIZES) * len(TRANSFORMS) * (len(profile['thread_modes']) + bool(profile['gpu_exe']))
+    print(f'Matrix: {total} calls, up to {ROUNDS} rounds per method.', flush=True)
+    commands = list(matrix_commands(SIZES, TRANSFORMS, ROUNDS, directory, args.max_seconds, profile))
     runner = Runner(directory, args.dry_run, args.pipeline_logs, total)
     result_path = directory / 'benchmark_matrix.csv'
     try:
@@ -264,7 +316,7 @@ def main(argv=None):
             # Validate existing results before making any changes to the CSV.
             with result_path.open('rb') as source:
                 original_size = os.fstat(source.fileno()).st_size
-                completed, boundary = resume_position(source, commands)
+                completed, boundary = resume_position(source, commands, profile)
             print(f'Resume: {completed}/{total} Aufrufe vollstaendig gespeichert.', flush=True)
             if boundary < original_size:
                 print(f'Unvollstaendiger Aufruf {completed + 1} wird erneut gemessen; '
@@ -277,7 +329,7 @@ def main(argv=None):
         if completed == total:
             print('Alle Benchmarks bereits vollstaendig gespeichert.', flush=True)
             return
-        for executable in (CPU_EXE, GPU_EXE):
+        for executable in {command[0] for command in commands}:
             if not Path(executable).is_file():
                 raise FileNotFoundError(f'{executable} fehlt. Zuerst den CMake-Build ausfuehren.')
         directory.mkdir(parents=True, exist_ok=True)

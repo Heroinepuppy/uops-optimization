@@ -35,6 +35,18 @@
 #include <unistd.h>
 #endif
 
+#if defined(_MSC_VER)
+#define LIDAR_NOINLINE __declspec(noinline)
+#define LIDAR_SCALAR LIDAR_NOINLINE
+#else
+#define LIDAR_NOINLINE __attribute__((noinline))
+#if defined(__GNUC__) && !defined(__clang__)
+#define LIDAR_SCALAR __attribute__((noinline, optimize("no-tree-vectorize")))
+#else
+#define LIDAR_SCALAR LIDAR_NOINLINE
+#endif
+#endif
+
 struct Transform {
     float r00, r01, r02;
     float r10, r11, r12;
@@ -69,7 +81,8 @@ static void pin_this_thread_to_cpu(unsigned logical_cpu) {
 #endif
 }
 
-__declspec(noinline)
+#if !defined(__aarch64__) && !defined(_M_ARM64)
+LIDAR_NOINLINE
 void transform_soa_avx2_x2(const float* __restrict x,
                            const float* __restrict y,
                            const float* __restrict z,
@@ -145,6 +158,8 @@ void transform_soa_avx2_x2(const float* __restrict x,
     }
 }
 
+#endif
+
 struct CpuPairSelection {
     unsigned base_cpu{};
     unsigned smt_sibling{};
@@ -157,6 +172,7 @@ struct CpuPairSelection {
     bool four_ccx_found{false};
 };
 
+#if defined(_WIN32)
 static std::vector<unsigned> cpus_from_mask(KAFFINITY mask) {
     std::vector<unsigned> cpus;
     for (unsigned bit = 0; bit < sizeof(KAFFINITY) * 8; ++bit) {
@@ -330,8 +346,25 @@ static CpuPairSelection select_cpu_pairs(unsigned requested_cpu) {
     return result;
 }
 
+#else
+// Validate the requested Linux CPU; unsupported topology modes stay unavailable.
+// requested_cpu: logical CPU index in the process affinity mask.
+static CpuPairSelection select_cpu_pairs(unsigned requested_cpu) {
+    CpuPairSelection result{};
+    result.base_cpu = requested_cpu;
+    cpu_set_t allowed;
+    CPU_ZERO(&allowed);
+    if (sched_getaffinity(0, sizeof(allowed), &allowed) != 0)
+        throw std::runtime_error("Cannot read process CPU affinity");
+    if (requested_cpu >= CPU_SETSIZE || !CPU_ISSET(requested_cpu, &allowed))
+        throw std::runtime_error("Requested CPU is outside the process affinity mask");
+    return result;
+}
+#endif
+
+#if !defined(__aarch64__) && !defined(_M_ARM64)
 // AVX2 x2 transformation chain.
-__declspec(noinline)
+LIDAR_NOINLINE
 void transform_soa_avx2_x2_chain(const float* __restrict x,
                            const float* __restrict y,
                            const float* __restrict z,
@@ -416,14 +449,18 @@ void transform_soa_avx2_x2_chain(const float* __restrict x,
     }
 }
 
+#endif
+
 // Additional CPU methods.
 struct Point { float x, y, z; };
 
 // Original single-transform kernels, shared by the unified runner.
-__declspec(noinline)
+LIDAR_SCALAR
 void transform_aos_scalar(const Point* in, Point* out, std::size_t count,
                           const Transform& t) {
+#if defined(_MSC_VER)
 #pragma loop(no_vector)
+#endif
     for (std::size_t i = 0; i < count; ++i) {
         const float x = in[i].x;
         const float y = in[i].y;
@@ -435,7 +472,7 @@ void transform_aos_scalar(const Point* in, Point* out, std::size_t count,
     }
 }
 
-__declspec(noinline)
+LIDAR_SCALAR
 void transform_soa_scalar(const float* __restrict x,
                           const float* __restrict y,
                           const float* __restrict z,
@@ -444,7 +481,9 @@ void transform_soa_scalar(const float* __restrict x,
                           float* __restrict oz,
                           std::size_t count,
                           const Transform& t) {
+#if defined(_MSC_VER)
 #pragma loop(no_vector)
+#endif
     for (std::size_t i = 0; i < count; ++i) {
         const float X = x[i];
         const float Y = y[i];
@@ -456,7 +495,7 @@ void transform_soa_scalar(const float* __restrict x,
     }
 }
 
-__declspec(noinline)
+LIDAR_NOINLINE
 void transform_soa_auto(const float* __restrict x,
                         const float* __restrict y,
                         const float* __restrict z,
@@ -476,7 +515,8 @@ void transform_soa_auto(const float* __restrict x,
     }
 }
 
-__declspec(noinline)
+#if !defined(__aarch64__) && !defined(_M_ARM64)
+LIDAR_NOINLINE
 void transform_soa_avx2(const float* __restrict x,
                         const float* __restrict y,
                         const float* __restrict z,
@@ -525,7 +565,9 @@ void transform_soa_avx2(const float* __restrict x,
         _mm256_storeu_ps(oz + i, Zp);
     }
 
+#if defined(_MSC_VER)
 #pragma loop(no_vector)
+#endif
     for (; i < count; ++i) {
         const float X = x[i];
         const float Y = y[i];
@@ -538,7 +580,7 @@ void transform_soa_avx2(const float* __restrict x,
 }
 
 
-__declspec(noinline)
+LIDAR_NOINLINE
 void transform_soa_avx2_x4(const float* __restrict x,
                              const float* __restrict y,
                              const float* __restrict z,
@@ -679,7 +721,7 @@ void transform_soa_avx2_x4(const float* __restrict x,
 }
 
 
-__declspec(noinline)
+LIDAR_NOINLINE
 void transform_soa_avx2_x8(const float* __restrict x,
                            const float* __restrict y,
                            const float* __restrict z,
@@ -754,9 +796,11 @@ void transform_soa_avx2_x8(const float* __restrict x,
 }
 
 
+#endif
+
 // Repeated transforms stay in registers; only the final result is stored.
 template<bool AutoVectorize>
-__declspec(noinline) void transform_soa_scalar_chain(
+LIDAR_NOINLINE void transform_soa_scalar_chain(
     const float* __restrict x, const float* __restrict y, const float* __restrict z,
     float* __restrict ox, float* __restrict oy, float* __restrict oz,
     std::size_t count, const Transform& t, unsigned k) {
@@ -773,14 +817,40 @@ __declspec(noinline) void transform_soa_scalar_chain(
     if constexpr (AutoVectorize) {
         for(std::size_t i=0;i<count;++i) point(i);
     } else {
+#if defined(_MSC_VER)
 #pragma loop(no_vector)
+#endif
         for(std::size_t i=0;i<count;++i) point(i);
     }
 }
 
-__declspec(noinline) void transform_aos_chain(const Point* in, Point* out,
+#if defined(__GNUC__) && !defined(__clang__)
+// Keep the scalar chain separate from the compiler-vectorized specialization.
+// x/y/z and ox/oy/oz: non-overlapping arrays with count elements;
+// count: any size; t: affine transform; k: 1..65536 transformations.
+template<>
+LIDAR_SCALAR void transform_soa_scalar_chain<false>(
+    const float* __restrict x, const float* __restrict y, const float* __restrict z,
+    float* __restrict ox, float* __restrict oy, float* __restrict oz,
     std::size_t count, const Transform& t, unsigned k) {
+    for (std::size_t i = 0; i < count; ++i) {
+        float X = x[i], Y = y[i], Z = z[i];
+        for (unsigned step = 0; step < k; ++step) {
+            const float nx = t.r00*X + t.r01*Y + t.r02*Z + t.tx;
+            const float ny = t.r10*X + t.r11*Y + t.r12*Z + t.ty;
+            const float nz = t.r20*X + t.r21*Y + t.r22*Z + t.tz;
+            X = nx; Y = ny; Z = nz;
+        }
+        ox[i] = X; oy[i] = Y; oz[i] = Z;
+    }
+}
+#endif
+
+LIDAR_SCALAR void transform_aos_chain(const Point* in, Point* out,
+    std::size_t count, const Transform& t, unsigned k) {
+#if defined(_MSC_VER)
 #pragma loop(no_vector)
+#endif
     for(std::size_t i=0;i<count;++i) {
         float X=in[i].x,Y=in[i].y,Z=in[i].z;
         for(unsigned step=0;step<k;++step) {
@@ -793,7 +863,8 @@ __declspec(noinline) void transform_aos_chain(const Point* in, Point* out,
     }
 }
 
-__declspec(noinline) void transform_avx2_chain_x1(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
+#if !defined(__aarch64__) && !defined(_M_ARM64)
+LIDAR_NOINLINE void transform_avx2_chain_x1(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
     const __m256 r00=_mm256_set1_ps(t.r00);
     const __m256 r01=_mm256_set1_ps(t.r01);
     const __m256 r02=_mm256_set1_ps(t.r02);
@@ -832,7 +903,7 @@ __declspec(noinline) void transform_avx2_chain_x1(const float* x,const float* y,
     if(i<count) transform_soa_avx2_x2_chain(x+i,y+i,z+i,ox+i,oy+i,oz+i,count-i,t,k);
 }
 
-__declspec(noinline) void transform_avx2_chain_x4(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
+LIDAR_NOINLINE void transform_avx2_chain_x4(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
     const __m256 r00=_mm256_set1_ps(t.r00);
     const __m256 r01=_mm256_set1_ps(t.r01);
     const __m256 r02=_mm256_set1_ps(t.r02);
@@ -925,7 +996,7 @@ __declspec(noinline) void transform_avx2_chain_x4(const float* x,const float* y,
     if(i<count) transform_soa_avx2_x2_chain(x+i,y+i,z+i,ox+i,oy+i,oz+i,count-i,t,k);
 }
 
-__declspec(noinline) void transform_avx2_chain_x8(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
+LIDAR_NOINLINE void transform_avx2_chain_x8(const float* x,const float* y,const float* z, float* ox,float* oy,float* oz, std::size_t count,const Transform& t,unsigned k) {
     const __m256 r00=_mm256_set1_ps(t.r00);
     const __m256 r01=_mm256_set1_ps(t.r01);
     const __m256 r02=_mm256_set1_ps(t.r02);
@@ -1089,3 +1160,49 @@ __declspec(noinline) void transform_avx2_chain_x8(const float* x,const float* y,
     }
     if(i<count) transform_soa_avx2_x2_chain(x+i,y+i,z+i,ox+i,oy+i,oz+i,count-i,t,k);
 }
+
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+// Transform independent four-lane NEON vectors, retaining chains in registers.
+// Vectors: 1, 2, 4 or 8 vectors per block. x/y/z and ox/oy/oz: non-overlapping
+// arrays with count elements; count: any size; t: affine transform; k: 1..65536.
+template<unsigned Vectors>
+LIDAR_NOINLINE void transform_neon_chain(
+    const float* x, const float* y, const float* z,
+    float* ox, float* oy, float* oz, std::size_t count, const Transform& t, unsigned k) {
+    static_assert(Vectors == 1 || Vectors == 2 || Vectors == 4 || Vectors == 8);
+    std::size_t i = 0;
+    for (; i + 4 * Vectors <= count; i += 4 * Vectors) {
+        float32x4_t X[Vectors], Y[Vectors], Z[Vectors];
+        for (unsigned v = 0; v < Vectors; ++v) {
+            X[v] = vld1q_f32(x + i + 4*v);
+            Y[v] = vld1q_f32(y + i + 4*v);
+            Z[v] = vld1q_f32(z + i + 4*v);
+        }
+        for (unsigned step = 0; step < k; ++step) {
+            for (unsigned v = 0; v < Vectors; ++v) {
+                const auto nx = vaddq_f32(vfmaq_n_f32(vfmaq_n_f32(vmulq_n_f32(X[v], t.r00), Y[v], t.r01), Z[v], t.r02), vdupq_n_f32(t.tx));
+                const auto ny = vaddq_f32(vfmaq_n_f32(vfmaq_n_f32(vmulq_n_f32(X[v], t.r10), Y[v], t.r11), Z[v], t.r12), vdupq_n_f32(t.ty));
+                const auto nz = vaddq_f32(vfmaq_n_f32(vfmaq_n_f32(vmulq_n_f32(X[v], t.r20), Y[v], t.r21), Z[v], t.r22), vdupq_n_f32(t.tz));
+                X[v] = nx; Y[v] = ny; Z[v] = nz;
+            }
+        }
+        for (unsigned v = 0; v < Vectors; ++v) {
+            vst1q_f32(ox + i + 4*v, X[v]);
+            vst1q_f32(oy + i + 4*v, Y[v]);
+            vst1q_f32(oz + i + 4*v, Z[v]);
+        }
+    }
+    for (; i < count; ++i) {
+        float X = x[i], Y = y[i], Z = z[i];
+        for (unsigned step = 0; step < k; ++step) {
+            const float nx = std::fma(t.r02, Z, std::fma(t.r01, Y, t.r00*X)) + t.tx;
+            const float ny = std::fma(t.r12, Z, std::fma(t.r11, Y, t.r10*X)) + t.ty;
+            const float nz = std::fma(t.r22, Z, std::fma(t.r21, Y, t.r20*X)) + t.tz;
+            X = nx; Y = ny; Z = nz;
+        }
+        ox[i] = X; oy[i] = Y; oz[i] = Z;
+    }
+}
+#endif

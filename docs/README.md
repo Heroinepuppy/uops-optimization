@@ -18,6 +18,66 @@ Alle Befehle und relativen Ein-/Ausgabepfade beziehen sich auf das Projektverzei
 
 <a id="build"></a>
 
+## Raspberry Pi 5 build (ARMv8_PI5)
+
+The single VS Code `Build` task detects the native architecture through CMake
+and configures Ninja under `build`. ARM64 uses NEON and writes the executable
+to `build/bin/ARMv8/lidar_compute_cpu`; x86 uses AVX2/FMA and writes to
+`build/bin/lidar_compute_cpu`. With `LIDAR_BUILD_GPU=AUTO`, HIP is built on
+x86 only when `hipcc` is found through PATH, HIP_PATH or ROCM_PATH.
+`Run ARMv8` builds first and then verifies all ARM methods. No separate
+CPU, GPU or ARM build tasks are needed.
+
+The ARM CPU benchmark builds with GCC, CMake 3.25 or newer, and Ninja on
+64-bit Linux. Run all commands from the project directory:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIDAR_BUILD_GPU=OFF
+cmake --build build --parallel 4
+build/bin/lidar_compute_cpu --points 125 --transforms 1,8,1024 --method all --verify-only
+build/bin/lidar_compute_cpu --points 125 --transforms 1,8 --method all --rounds 2 --block-ms 1 --output-dir build/smoke-results
+```
+
+ARM methods are `aos`, `soa`, `auto`, `neon`, `neonx2`, `neonx4`, and
+`neonx8`. Each NEON vector contains four floats; the suffix gives the number
+of independent vectors per block. The ARM default is `neonx2` on CPU 0.
+Use `--cpu N` to select another allowed logical CPU. Thread modes `single`, `two-core`, and `four-core` use 1, 2, or 4 distinct
+physical cores permitted by Linux process affinity. Points are divided into
+balanced, disjoint ranges; each worker is pinned to its selected CPU. The
+measured multi-core duration includes worker barrier synchronization. Linux
+SMT/CCX topology selection is not implemented yet. The runner discovers all
+available modes automatically (891 calls on an unrestricted Pi 5).
+
+Existing single-mode CSVs do not match the expanded matrix and are rejected
+without modification. Use a separate `--output-dir` for a new multi-core
+matrix when retaining an earlier single-core measurement series.
+ARM measurements use NEON method names in CSVs, so they are distinguishable
+from existing AVX2 results. The matrix runner automatically prefers this native
+ARMv8 executable, queries its `--capabilities`, and selects only supported
+thread modes and methods. On ARM64 it omits HIP and writes to
+`results/data/armv8/benchmark_matrix.csv` by default. Existing analysis method
+selection still needs adaptation for NEON comparisons.
+
+```bash
+python3 benchmarks/run_all_benchmarks.py --dry-run
+python3 benchmarks/run_all_benchmarks.py
+```
+
+The runner queries CPU capabilities even in dry-run mode, but does not run
+measurements or write files. Build first. On x86 it finds current or legacy
+build paths and includes HIP only when a GPU executable exists; a real run
+also checks GPU availability before selecting the matrix. `--output-dir`
+overrides the architecture-specific result directory. Resume validates the
+selected methods and matrix before modifying any existing CSV.
+
+The VS Code build tasks include configuration directly, without separate
+Configure tasks. `Build` configures Ninja and builds all enabled targets.
+`Run CPU` validates the x86 CPU program; `Run ARMv8` validates the ARM program.
+Executables are written to `build/bin`. HIP is optional; the unified Build task detects its compiler automatically; enable it with `-DLIDAR_BUILD_GPU=ON` on a machine with the AMD HIP
+SDK. `Build` enables HIP automatically when its compiler is available; `Run GPU` requires a
+successful GPU build. The older Windows commands below describe the previous build
+layout; the current executable output directory is `build/bin`.
+
 ## Build
 
 CMake erzeugt aktuell genau zwei Benchmark-Programme:

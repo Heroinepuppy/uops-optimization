@@ -7,9 +7,78 @@
   },
   "tasks": [
     {
+      "label": "Build",
+      "type": "shell",
+      "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIDAR_REQUIRE_ARMV8=OFF -DLIDAR_BUILD_GPU=AUTO && cmake --build build --parallel",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "shell": {
+          "executable": "/bin/bash",
+          "args": [
+            "-c"
+          ]
+        }
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "windows": {
+        "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIDAR_REQUIRE_ARMV8=OFF -DLIDAR_BUILD_GPU=AUTO && cmake --build build --parallel",
+        "options": {
+          "shell": {
+            "executable": "cmd.exe",
+            "args": [
+              "/d",
+              "/c"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "label": "Run CPU",
+      "type": "process",
+      "command": "${workspaceFolder}/build/bin/lidar_compute_cpu",
+      "args": [
+        "--points",
+        "125",
+        "--transforms",
+        "1,8",
+        "--verify-only"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "windows": {
+        "command": "${workspaceFolder}/build/bin/lidar_compute_cpu.exe"
+      }
+    },
+    {
+      "label": "Run GPU",
+      "type": "process",
+      "command": "${workspaceFolder}/build/bin/lidar_compute_gpu",
+      "args": [
+        "--points",
+        "125",
+        "--transforms",
+        "1,8",
+        "--verify-only"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "windows": {
+        "command": "${workspaceFolder}/build/bin/lidar_compute_gpu.exe"
+      }
+    },
+    {
       "label": "Analyse",
       "type": "process",
-      "command": "${workspaceFolder}/.venv-analysis/Scripts/python.exe",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-E",
         "analysis/run_analysis.py",
@@ -23,41 +92,60 @@
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "problemMatcher": []
+      "problemMatcher": [],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      }
     },
     {
-      "label": "Configure",
+      "label": "Run benchmark matrix",
       "type": "process",
-      "command": "powershell",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
-        "-NoProfile",
-        "-Command",
-        "$cmakeExe = $env:CMAKE_COMMAND; if (-not $cmakeExe) { $found = Get-Command cmake -ErrorAction SilentlyContinue; if ($found) { $cmakeExe = $found.Source } }; if (-not $cmakeExe -and (Test-Path 'build/vs2026/CMakeCache.txt')) { $entry = Select-String -Path 'build/vs2026/CMakeCache.txt' -Pattern '^CMAKE_COMMAND:INTERNAL='; if ($entry) { $cmakeExe = $entry.Line.Split('=', 2)[1] } }; if (-not $cmakeExe) { throw 'CMake im PATH bereitstellen oder CMAKE_COMMAND setzen.' }; & $cmakeExe '-S' '.' '-B' 'build/vs2026' '-G' 'Visual Studio 18 2026' '-A' 'x64'; exit $LASTEXITCODE"
+        "benchmarks/run_all_benchmarks.py",
+        "--dry-run"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": [],
-      "hide": true
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
+      }
     },
     {
-      "label": "Build",
+      "label": "Run hardware info",
       "type": "process",
-      "command": "powershell",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
-        "-NoProfile",
-        "-Command",
-        "$cmakeExe = $env:CMAKE_COMMAND; if (-not $cmakeExe) { $found = Get-Command cmake -ErrorAction SilentlyContinue; if ($found) { $cmakeExe = $found.Source } }; if (-not $cmakeExe -and (Test-Path 'build/vs2026/CMakeCache.txt')) { $entry = Select-String -Path 'build/vs2026/CMakeCache.txt' -Pattern '^CMAKE_COMMAND:INTERNAL='; if ($entry) { $cmakeExe = $entry.Line.Split('=', 2)[1] } }; if (-not $cmakeExe) { throw 'CMake im PATH bereitstellen oder CMAKE_COMMAND setzen.' }; & $cmakeExe '--build' 'build/vs2026' '--config' 'Release'; exit $LASTEXITCODE"
+        "benchmarks/hardware_info.py"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
-      "dependsOn": "Configure",
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": true
+      "problemMatcher": [],
+      "windows": {
+        "command": "${workspaceFolder}/.venv/Scripts/python.exe"
       }
+    },
+    {
+      "type": "process",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "label": "Run ARMv8",
+      "command": "${workspaceFolder}/build/bin/ARMv8/lidar_compute_cpu",
+      "args": [
+        "--points",
+        "125",
+        "--transforms",
+        "1,8,1024",
+        "--method",
+        "all",
+        "--verify-only"
+      ],
+      "dependsOn": "Build"
     }
   ]
 }

@@ -4,3 +4,4 @@
 /.venv-analysis/
 /results/pics/
 *.pyc
+/.venv/*
