@@ -50,10 +50,12 @@ class AnalysisTests(unittest.TestCase):
                 self.assertTrue(all(key[-1] != 'CPU 4T / 4 CCX'
                                     for key in data.sample_groups(directory / 'benchmark_matrix.csv', 1)))
 
-    def test_no_selection_does_not_read_data(self):
+    def test_help_does_not_read_data(self):
         with patch.object(data, 'load', side_effect=AssertionError('data access')):
             with redirect_stdout(io.StringIO()):
-                run_analysis.main([])
+                with self.assertRaises(SystemExit) as exit_status:
+                    run_analysis.main(['--help'])
+                self.assertEqual(exit_status.exception.code, 0)
 
     def test_numerical_models(self):
         width, bins = calculations.histogram([2, 2, 2])
@@ -64,6 +66,36 @@ class AnalysisTests(unittest.TestCase):
         self.assertAlmostEqual(result['c'], 3)
         result = calculations.fit([(x, 2 + 5 * math.exp(-.4 * x)) for x in range(6)], True)
         self.assertLess(result['rmse_us'], 1e-6)
+
+    def test_exponential_spline_joins(self):
+        inverse_rows = [dict(points=n, x=2/(n/1e6), lower=1, upper=1000)
+                        for n in (8192, 16384, 32768, 65536)]
+        inverse_report = calculations.inverse_comparison_fit(
+            inverse_rows, calculations.exponential_spline_fit(inverse_rows))
+        region = inverse_report['regions'][0]
+        self.assertEqual(region['best_by_log_rmse'], 'inverse')
+        self.assertAlmostEqual(region['inverse_a'], 2)
+        self.assertAlmostEqual(region['metrics']['inverse']['rmse_log'], 0)
+        rising_bridge = {'segments': [
+            dict(start=1., end=2., log_a=math.log(40), b=.5),
+            dict(start=4., end=8., log_a=math.log(30), b=0.)]}
+        endpoint = calculations.exponential_spline(rising_bridge, 2.)
+        values = [calculations.exponential_spline(rising_bridge, 2+i/100) for i in range(201)]
+        self.assertTrue(all(endpoint-1e-10 <= y <= 30+1e-10 for y in values))
+        self.assertTrue(all(a <= b+1e-10 for a,b in zip(values,values[1:])))
+        records = [dict(points=n, x=100*math.exp(-n/1e6),
+                        lower=1, upper=200) for n in (8192, 16384, 32768, 131072, 262144, 524288)]
+        model = calculations.exponential_spline_fit(records)
+        self.assertEqual(model['unsupported_regions'], ['L1', 'RAM'])
+        self.assertEqual([s['region'] for s in model['segments']], ['L2', 'L3'])
+        for segment in model['segments']:
+            for x in (segment['start'], segment['end']):
+                self.assertAlmostEqual(calculations.exponential_spline(model, x),
+                                       100*math.exp(-x), places=6)
+                h = x * 1e-5
+                left = (calculations.exponential_spline(model,x)-calculations.exponential_spline(model,x-h))/h
+                right = (calculations.exponential_spline(model,x+h)-calculations.exponential_spline(model,x))/h
+                self.assertAlmostEqual(left, right, delta=.01)
 
     def test_all_plots_from_synthetic_matrix(self):
         with tempfile.TemporaryDirectory(prefix='analysis-test-') as temporary:
@@ -76,10 +108,10 @@ class AnalysisTests(unittest.TestCase):
             self.assertEqual([row['first_gpu_win'] for row in summary], [16, 8, 4, 2])
             output = directory / 'plots'
             with patch.object(plots, 'pyplot', side_effect=AssertionError('rendering')):
-                run_analysis.main(['--plots', 'all', '--result-dir', str(directory),
+                run_analysis.main(['--result-dir', str(directory),
                                    '--output-dir', str(output), '--no-plot'])
             self.assertEqual(list(output.glob('*.png')), [])
-            self.assertTrue((output / 'crossover_exponential_fit.json').is_file())
+            self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.json').is_file())
             self.assertEqual((directory / 'benchmark_matrix.csv').read_bytes(), before)
 
     def test_partial_or_duplicate_matrix_is_rejected(self):
@@ -102,8 +134,14 @@ class AnalysisTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()):
                 run_analysis.main(['--plots', 'all', '--result-dir', str(directory),
                                    '--output-dir', str(output)])
-            images = list(output.glob('*.png'))
-            self.assertEqual(len(images), 24)
+            images = list(output.rglob('*.png'))
+            self.assertTrue(list((output / 'hist').glob('*.png')))
+            self.assertTrue(list((output / 'hist' / 'matrix').glob('histograms_points_*.png')))
+            self.assertTrue((output / 'crossover' / 'compute_comparison.png').is_file())
+            self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.png').is_file())
+            self.assertEqual(len(images), 36)
+            self.assertEqual({p.name for p in (output / 'comparision').glob('*.png')},
+                             {f'cpu_gpu_comparison_transforms_{n}.png' for n in (1, 2, 4, 8, 16, 32)})
             for image in images:
                 self.assertEqual(image.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
                 self.assertGreater(image.stat().st_size, 1000)
@@ -147,6 +185,47 @@ class AnalysisTests(unittest.TestCase):
                 plots.save_figures(directory, plots.crossover_plot(report, reports))
             self.assertTrue((directory / 'crossover_by_point_count_from_200k.png').exists())
             self.assertTrue((directory / 'crossover_hyperbola_transition.png').exists())
+            self.assertEqual(plots.pyplot().get_fignums(), [])
+
+    def test_matrix_plots_and_histogram_peaks(self):
+        self.assertEqual(calculations.histogram_peak([7]), 7)
+        self.assertEqual(calculations.histogram_peak([7, 7]), 7)
+        self.assertAlmostEqual(calculations.histogram_peak([1, 1, 61]), 1.5)
+        self.assertAlmostEqual(calculations.histogram_peak([1, 61]), 1.5)
+        with tempfile.TemporaryDirectory(prefix='analysis-matrix-') as temporary:
+            directory = Path(temporary)
+            rows = write_matrix(directory)
+            groups = data.read_matrix(directory, raw_samples=True)
+            self.assertEqual(sum(map(len, groups.values())), len(rows))
+            groups = {key: value for key, value in groups.items()
+                      if key[2] in (100000, 200000) and key[3] in (1, 2)
+                      and key[4] in (calculations.CPU, calculations.GPU)}
+            cpu_key = ('cpu', 'four-ccx', 100000, 1, calculations.CPU)
+            groups[cpu_key] = [1, 1, 61]
+            figures = plots.histogram_matrix_plot(groups)
+            name, figure = next(figures)
+            self.assertEqual(name, 'histograms_points_100000')
+            self.assertEqual(len(figure.axes), 4)
+            self.assertIn('four-ccx', figure.axes[0].get_title())
+            self.assertIn('2 Transformationen', figure.axes[2].get_ylabel())
+            self.assertEqual(figure.axes[0].lines[0].get_xdata()[0], 1.5)
+            with redirect_stdout(io.StringIO()):
+                plots.save_figures(directory, [(name, figure)])
+                plots.save_figures(directory, figures)
+            name, figure = next(plots.runtime_by_points_plot(groups))
+            self.assertEqual(name, 'runtime_by_points_four-ccx')
+            self.assertEqual(list(figure.axes[0].lines[0].get_xdata()), [100000, 200000])
+            self.assertEqual(figure.axes[0].lines[0].get_ydata()[0], 1.5)
+            self.assertEqual(figure.axes[0].get_yscale(), 'log')
+            self.assertIsNotNone(figure.axes[0].get_legend())
+            self.assertAlmostEqual(figure.axes[0].lines[-1].get_xdata()[0],
+                                   64 * 2**20 / 24)
+            with redirect_stdout(io.StringIO()):
+                plots.save_figures(directory, [(name, figure)])
+            images = list(directory.glob('*.png'))
+            self.assertEqual(len(images), 3)
+            for image in images:
+                self.assertEqual(image.read_bytes()[:8], b'\x89PNG\r\n\x1a\n')
             self.assertEqual(plots.pyplot().get_fignums(), [])
 
     def test_legacy_files(self):

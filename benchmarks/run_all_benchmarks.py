@@ -14,7 +14,7 @@ import time
 ROOT = Path('.')
 CPU_EXE = 'build/vs2026/Release/lidar_compute_cpu.exe'
 GPU_EXE = 'build/gpu/lidar_compute_gpu.exe'
-SIZES = [2**i for i in range(26)]
+SIZES = [2**i for i in range(27)]
 TRANSFORMS = [2**i for i in range(11)]
 ROUNDS = 300
 CPU_METHODS = ['aos', 'soa', 'auto', 'fma', 'avx2x2', 'avx2x4', 'avx2x8']
@@ -28,7 +28,7 @@ def matrix_commands(sizes, counts, rounds, directory, max_seconds=600):
 
     Args:
         sizes: Reusable iterable of positive integer point counts; the configured
-            matrix uses powers of two from 1 through 2**25. May be empty.
+            matrix uses powers of two from 1 through 2**26. May be empty.
         counts: Reusable iterable of positive integer transformation counts;
             the configured matrix uses powers of two from 1 through 2**10.
             May be empty; numeric limits are enforced by the executables.

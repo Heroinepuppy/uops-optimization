@@ -58,8 +58,8 @@ steht in der [Methodik](benchmark_methodik.md#gpu-messpfade).
 | Frueherer Stand | Heutiger Stand |
 | --- | --- |
 | Getrennte Uop-, Threading- und geplante Grossgroessenprogramme | Gemeinsames CPU-Programm mit Methoden- und Thread-Auswahl |
-| Groessenfolge 200k, 400k, 800k bis 25,6M | Zweierpotenzen von 1 bis 33.554.432 Punkten |
-| Unterschiedliche feste Rundenzahlen fuer einzelne Versuche | Maximal 300 im Matrix-Runner, einmalige Hochrechnung auf zehn Minuten |
+| Groessenfolge 200k, 400k, 800k bis 25,6M | Zweierpotenzen von 1 bis 67.108.864 Punkten |
+| Unterschiedliche feste Rundenzahlen fuer einzelne Versuche | Maximal 300 im Matrix-Runner, einmalige Hochrechnung mit konfigurierbarem Zeitbudget (Standard: 300 Sekunden) |
 | Separate CPU-/GPU-Textdateien und Einzel-CSVs | Gemeinsame Matrix-CSV; alte Compute-CSVs bleiben fuer Analyse lesbar |
 | Gnuplot und mehrere Analyse-Einstiegsskripte | Matplotlib ueber `analysis/run_analysis.py` |
 | Runner-Phasen fuer Sweep und Verfeinerung | Runner fuer Matrix und Resume; Analyse separat |
@@ -72,6 +72,11 @@ Analyse kann gespeicherte Daten dazu auswerten; die alten Runner-Befehle fuer di
 Phasen sind keine gueltige Bedienungsanleitung mehr.
 
 ## Geplante Bereinigung nach der ersten Auswertung
+
+Aktueller Stand: Neue Messungen verwenden bereits `avx2x2 / four-ccx`.
+Analyse und Resume akzeptieren weiterhin den alten Namen und normalisieren
+ihn beim Lesen; dabei wird die vorhandene CSV nicht umgeschrieben. Die unten
+geplante vollstaendige Entfernung der Kompatibilitaet ist noch offen.
 
 - Nach Abschluss des ersten Benchmarklaufs und seiner ersten Auswertung den
   Sondernamen `CPU 4T / 4 CCX` durch `avx2x2 / four-ccx` ersetzen.

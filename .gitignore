@@ -1,6 +1,6 @@
-/results
 /build
 /__pycache__/*
 /Agentic_behaviour/*
 /.venv-analysis/
+/results/pics/
 *.pyc

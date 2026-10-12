@@ -7,6 +7,25 @@
   },
   "tasks": [
     {
+      "label": "Analyse",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv-analysis/Scripts/python.exe",
+      "args": [
+        "-E",
+        "analysis/run_analysis.py",
+        "--plots",
+        "comparison",
+        "cpu-gpu",
+        "fits",
+        "histogram-matrix",
+        "runtime-by-points"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Configure",
       "type": "process",
       "command": "powershell",
