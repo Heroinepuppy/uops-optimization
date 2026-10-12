@@ -102,8 +102,7 @@
       "type": "process",
       "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
-        "benchmarks/run_all_benchmarks.py",
-        "--dry-run"
+        "benchmarks/run_all_benchmarks.py"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
