@@ -116,6 +116,37 @@ class NativeMatrixTests(unittest.TestCase):
         self.assertEqual(selected, self.profile)
         self.assertEqual(query.call_args.args[0], [self.profile['cpu_exe'], '--capabilities'])
 
+    def test_vulkan_discovery_and_gpu_resume(self):
+        vulkan = 'build/bin/ARMv8/lidar_compute_vulkan'
+        gpu_methods = ['GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download']
+        cpu_json = json.dumps({key: self.profile[key] for key in ('methods', 'thread_modes', 'cpu')})
+        responses = [SimpleNamespace(stdout=cpu_json),
+                     SimpleNamespace(returncode=0, stdout=json.dumps({'methods': gpu_methods}))]
+        with patch.object(Path, 'is_file', lambda path: str(path) in (self.profile['cpu_exe'], vulkan)), \
+                patch.object(runner.subprocess, 'run', side_effect=responses):
+            profile = runner.select_profile(SimpleNamespace(architecture='aarch64'))
+        self.assertEqual(profile['gpu_exe'], vulkan)
+        commands = list(runner.matrix_commands([1], [1], 2, Path('build/test-results'), profile=profile))
+        self.assertEqual(len(commands), 4)
+        rows = [dict(device='cpu', thread_mode=mode, points=1, transformations=1,
+                     method=f'{method} / {mode}', sample=0, us=1, median_us=1,
+                     peak_us=1, samples=1, us_per_transform=1, invalid_samples=0)
+                for mode in profile['thread_modes'] for method in profile['methods']]
+        rows.extend(dict(device='gpu', thread_mode='', points=1, transformations=1,
+                         method=method, sample=0, us=1, median_us=1, peak_us=1,
+                         samples=1, us_per_transform=1, invalid_samples=0) for method in gpu_methods)
+        encoded = self.encode(rows)
+        self.assertEqual(runner.resume_position(io.BytesIO(encoded), commands, profile), (4, len(encoded)))
+        self.assertEqual(runner.resume_position(io.BytesIO(self.encode(rows[:-1])), commands, profile)[0], 3)
+
+    def test_software_renderer_is_not_included(self):
+        cpu_json = json.dumps({key: self.profile[key] for key in ('methods', 'thread_modes', 'cpu')})
+        with patch.object(Path, 'is_file', return_value=True), \
+                patch.object(runner.subprocess, 'run', side_effect=[SimpleNamespace(stdout=cpu_json),
+                    SimpleNamespace(returncode=1, stderr='No hardware Vulkan compute GPU')]):
+            profile = runner.select_profile(SimpleNamespace(architecture='aarch64'))
+        self.assertIsNone(profile['gpu_exe'])
+
     encode = ResumeTests.encode
 
 

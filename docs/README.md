@@ -18,6 +18,243 @@ Alle Befehle und relativen Ein-/Ausgabepfade beziehen sich auf das Projektverzei
 
 <a id="build"></a>
 
+## Raspberry Pi 5 Vulkan GPU compute
+
+Run these steps on the Raspberry Pi itself, using 64-bit Raspberry Pi OS.
+All project commands below are run from the repository root. Vulkan compute
+works headlessly over SSH; a connected monitor is not required.
+
+### 1. Install system dependencies
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake ninja-build libvulkan-dev glslang-tools mesa-vulkan-drivers vulkan-tools python3-venv
+```
+
+`libvulkan-dev` provides the Vulkan headers and linker library;
+`glslang-tools` compiles the compute shader; `mesa-vulkan-drivers` provides
+the V3DV hardware driver; `vulkan-tools` provides `vulkaninfo` for diagnosis.
+These are system packages, not Python packages installed through pip.
+
+If the Python environment has not been created yet:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+The runner itself uses only the Python standard library. The requirements
+install Matplotlib and its dependencies for analysis.
+
+### 2. Check hardware GPU access
+
+```bash
+vulkaninfo --summary
+ls -l /dev/dri
+```
+
+The device list must include a `V3D` device with type
+`PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU`. A device named `llvmpipe` with type
+`PHYSICAL_DEVICE_TYPE_CPU` is a software renderer and does not establish GPU
+access. The tested Pi reported `V3D 7.1.7.0` through the V3DV Mesa driver.
+A missing DISPLAY message is expected when using SSH and does not prevent
+headless compute.
+
+If only software rendering is listed, check that the Mesa driver is installed
+and the current user can access the DRM render device under `/dev/dri`.
+Restricted containers or sandboxes may hide these devices; run the check in
+the normal Pi SSH terminal. If there is a device permission error, inspect
+its owning group with `ls -l /dev/dri`; add the user to that group if needed
+(typically `render`), then reconnect the SSH session:
+
+```bash
+sudo usermod -aG render "$USER"
+```
+
+### 3. Build CPU and Vulkan GPU programs
+
+Use the VS Code `Build` task, or run its equivalent:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIDAR_REQUIRE_ARMV8=OFF -DLIDAR_BUILD_GPU=AUTO
+cmake --build build --parallel 4
+```
+
+CMake should report `Vulkan GPU benchmark enabled`. If it reports disabled,
+check that the Vulkan development headers and `glslangValidator` are
+installed, then configure again. On ARM, `LIDAR_BUILD_GPU` controls the
+separate AMD HIP backend; Vulkan is detected independently.
+
+The executable is `build/bin/ARMv8/lidar_compute_vulkan`. The shader is
+compiled and embedded during the build, so no runtime shader path is needed.
+
+### 4. Verify results before starting the full matrix
+
+```bash
+build/bin/ARMv8/lidar_compute_vulkan --capabilities
+build/bin/ARMv8/lidar_compute_vulkan --points 125 --transforms 1,8,1024 --verify-only
+```
+
+The capability query lists supported timing modes. The correctness check
+must print `Vulkan GPU validation passed.` and exit successfully. The VS Code
+`Run Vulkan GPU` task builds and performs this same reference check.
+Software renderers are explicitly rejected by the executable.
+
+### 5. Run the benchmark matrix
+
+The matrix runner queries the Vulkan executable and selects it only when a
+hardware compute GPU is accessible. CPU software renderers such as llvmpipe
+are excluded. On the Pi, CPU plus Vulkan measurements default to
+`results/data/armv8-vulkan/benchmark_matrix.csv`, preserving CPU-only results.
+An expanded CPU/GPU matrix has 1188 calls on a four-core Pi.
+
+```bash
+.venv/bin/python benchmarks/run_all_benchmarks.py --dry-run
+.venv/bin/python benchmarks/run_all_benchmarks.py --pipeline-logs
+```
+
+Six coherent host-visible SoA buffers are mapped once. Resident GPU timing
+uses these shared buffers without per-measurement upload/download copies;
+fences and memory barriers still synchronize access. The four CSV timing
+labels retain compatibility with HIP: GPU timestamps measure `GPU kernel
+only` when available; `GPU resident (host sync)` includes submission and fence
+waiting; `Upload + GPU` adds CPU copies into mapped input buffers; `Upload +
+GPU + Download` adds output copies too. These are RAM copies on the Pi,
+not PCIe transfers. Missing GPU timestamp support omits kernel-only timing
+instead of substituting a CPU clock. Large arrays are split into descriptor
+ranges and a two-dimensional dispatch to respect device limits.
+
+A small validation and smoke benchmark does not establish a general speedup.
+Compare resident GPU timing and end-to-end copies against NEON for each
+point count, transformation count and core count. Initial measurements of
+the current Vulkan kernel did not outperform the four-core NEON kernel.
+
+## Pi GPU performance-counter tools
+
+### Purpose and scope
+
+We installed Perfetto and built Mesa's `pps-producer` to inspect the GPU
+activity of the Vulkan LiDAR benchmark. Thousands of scheduled workgroups
+provide parallel work, but that alone does not show hardware utilization.
+The V3D counters record shader instructions, pipeline bubbles and stalls,
+helping distinguish compute work from waits for texture/memory units,
+uniforms and special-function units.
+
+These are aggregated counters, not a per-QPU occupancy report. They must
+not be presented as proof that every individual compute unit is active.
+The producer is system-wide: desktop rendering and other GPU applications
+can also contribute. Profile a short, otherwise quiet run separately from
+normal benchmark timing; counter collection can affect execution times.
+
+### Install and build
+
+Perfetto is available as a Raspberry Pi OS package. The installed Mesa 24.2
+source does not include the V3D PPS datasource, so the producer is built
+locally from Mesa 26.1.0. No system graphics driver replacement is required
+for this counter-only setup. Commands are relative to the repository root:
+
+```bash
+sudo apt update
+sudo apt install perfetto build-essential git meson ninja-build pkg-config libdrm-dev libexpat1-dev libzstd-dev libelf-dev zlib1g-dev bison flex python3-mako python3-yaml python3-packaging
+mkdir -p build/profiling
+git -c http.version=HTTP/1.1 clone --depth 1 --branch mesa-26.1.0 https://gitlab.freedesktop.org/mesa/mesa.git build/profiling/mesa-counters
+meson setup build/profiling/mesa-build build/profiling/mesa-counters -Dperfetto=true -Ddatasources=auto -Dvulkan-drivers=broadcom -Dgallium-drivers= -Dplatforms= -Dglx=disabled -Degl=disabled -Dgbm=disabled -Dllvm=disabled -Dopengl=false -Dgles1=disabled -Dgles2=disabled -Dbuildtype=release
+ninja -C build/profiling/mesa-build -j 2 src/tool/pps/pps-producer
+```
+
+Mesa 26.1.0 requires Meson 1.4 or newer (`meson --version`); this Pi has 1.5.1.
+Configuration downloads the pinned Perfetto v47.0 SDK as a Meson subproject.
+The system tracing tools installed here are Perfetto v48.1. Only the
+producer target is built; do not run `meson install`, which would install
+other Mesa components. Sources and compiled tools remain in ignored `build/`.
+
+### Capture a short benchmark
+
+The checked-in `docs/v3d-counters.cfg` requests a ten-second trace with a
+one-millisecond sampling interval. In one SSH terminal, start the producer:
+
+```bash
+sudo env V3D_DS_COUNTER=cycle-count,QPU-active,QPU-wait-bubble,QPU-stalls,QPU-stalls-TMU,QPU-stalls-uniforms,QPU-stalls-SFU build/profiling/mesa-build/src/tool/pps/pps-producer v3d
+```
+
+In a second terminal, start the trace:
+
+```bash
+mkdir -p build/profiling/traces
+sudo /usr/sbin/tracebox --system-sockets --txt -c docs/v3d-counters.cfg -o build/profiling/traces/pi-vulkan.perfetto-trace
+```
+
+While capture runs, start a short workload from a third terminal:
+
+```bash
+build/bin/ARMv8/lidar_compute_vulkan --points 200000 --transforms 128 --rounds 20 --output-dir build/profiling/benchmark
+```
+
+After capture completes, stop the producer with Ctrl+C. The root capture
+creates a root-owned trace. Make it readable by your normal SSH user:
+
+```bash
+sudo chown "$USER" build/profiling/traces/pi-vulkan.perfetto-trace
+```
+
+Copy the trace to
+another machine if desired and open it locally through
+[Perfetto UI](https://ui.perfetto.dev). Look for the V3D counter tracks;
+a nonempty trace file alone does not establish that GPU counters were recorded.
+
+Root access is used for global DRM performance counters and trace sockets.
+If the producer reports that global perfmon is unavailable, the kernel lacks
+the required interface; installing Perfetto alone cannot fix that. Unknown
+counter names must be checked against the running kernel's V3D counter list.
+Only one V3D hardware performance monitor can be active at a time.
+
+### Installation verification
+
+The local producer built successfully against Mesa 26.1.0 and its Perfetto
+v47.0 SDK. A ten-second trace collected seven V3D counter tracks and 8590
+GPU-counter events while a 200000-point, 128-transform, 20-round Vulkan
+benchmark passed validation. The producer reported its first hardware
+counters and a successful trace flush. The trace also contains positive
+shader-instruction counts; this verifies counter access, not full per-QPU
+utilization. The producer was stopped after capture; no profiling service
+was enabled permanently.
+
+The verification artifacts are in `build/profiling/traces/`:
+`pi-vulkan.perfetto-trace`, `producer.log`, `capture.log`, and `benchmark.log`.
+
+### Approximate compute-queue utilization
+
+Read `gpu_stats` under the V3D render device in `/sys/class/drm/` before and
+after the workload. The `csd` row describes the compute queue. Calculate:
+
+```text
+compute busy (%) = 100 * delta(csd.runtime) / delta(csd.timestamp)
+```
+
+Both fields are in nanoseconds. This measures the time with a compute job
+active, including stalls; it is not the percentage of theoretical arithmetic
+throughput or the occupancy of each QPU. Do not add queue percentages to
+estimate total GPU usage, since queues can overlap.
+
+A separate 200000-point, 128-transform, 40-round Vulkan run produced 169
+compute jobs. The sampling window was 8.818 seconds, of which 8.549 seconds
+were counted as compute-queue runtime: approximately 96.95% busy. The peak
+across 100-ms sampling windows was approximately 99.87%. Startup, reference
+validation, warm-up and output writing are included in the overall window.
+Results are in `build/profiling/utilization/queue-utilization.json`.
+
+The earlier Perfetto trace (20 rounds, a separate system-wide capture)
+recorded 53868531 shader-instruction counts, 16480756 pipeline wait bubbles
+and 13377139 stalled qcycles. TMU and uniform stall counters also increased;
+the SFU stall counter did not. These counters have different meanings and
+must not be divided indiscriminately into a claimed ALU utilization percent.
+Deltas are in `build/profiling/utilization/counter-deltas.json`.
+
+The counter-only producer works with the system Vulkan driver. Additional
+`gpu.renderstages.broadcom` traces require a Perfetto-enabled Vulkan driver;
+that is separate from this installation. See the upstream
+[Mesa Perfetto instructions](https://docs.mesa3d.org/perfetto.html).
+
 ## Raspberry Pi 5 build (ARMv8_PI5)
 
 The single VS Code `Build` task detects the native architecture through CMake
@@ -34,8 +271,8 @@ The ARM CPU benchmark builds with GCC, CMake 3.25 or newer, and Ninja on
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLIDAR_BUILD_GPU=OFF
 cmake --build build --parallel 4
-build/bin/lidar_compute_cpu --points 125 --transforms 1,8,1024 --method all --verify-only
-build/bin/lidar_compute_cpu --points 125 --transforms 1,8 --method all --rounds 2 --block-ms 1 --output-dir build/smoke-results
+build/bin/ARMv8/lidar_compute_cpu --points 125 --transforms 1,8,1024 --method all --verify-only
+build/bin/ARMv8/lidar_compute_cpu --points 125 --transforms 1,8 --method all --rounds 2 --block-ms 1 --output-dir build/smoke-results
 ```
 
 ARM methods are `aos`, `soa`, `auto`, `neon`, `neonx2`, `neonx4`, and
@@ -54,8 +291,9 @@ matrix when retaining an earlier single-core measurement series.
 ARM measurements use NEON method names in CSVs, so they are distinguishable
 from existing AVX2 results. The matrix runner automatically prefers this native
 ARMv8 executable, queries its `--capabilities`, and selects only supported
-thread modes and methods. On ARM64 it omits HIP and writes to
-`results/data/armv8/benchmark_matrix.csv` by default. Existing analysis method
+thread modes and methods. On ARM64 it omits HIP, detects hardware Vulkan compute when built, and writes
+CPU-only results to `results/data/armv8/benchmark_matrix.csv` or CPU/Vulkan
+results to `results/data/armv8-vulkan/benchmark_matrix.csv`. Existing analysis method
 selection still needs adaptation for NEON comparisons.
 
 ```bash

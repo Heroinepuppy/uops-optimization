@@ -65,6 +65,13 @@ def detect() -> HardwareInfo:
     elif (rocm := _command("rocminfo")):
         gpus.extend(dict.fromkeys(line.split(":", 1)[1].strip() for line in rocm.splitlines()
                                   if "Marketing Name:" in line))
+    if not gpus and (vulkan := _command("vulkaninfo", "--summary")):
+        # Ignore CPU software renderers when reporting compute hardware.
+        for block in re.split(r"GPU[0-9]+:", vulkan)[1:]:
+            if re.search(r"deviceType\s*=\s*PHYSICAL_DEVICE_TYPE_(INTEGRATED|DISCRETE)_GPU", block):
+                name = re.search(r"deviceName\s*=\s*(.+)", block)
+                if name:
+                    gpus.append(name.group(1).strip())
     return HardwareInfo(cpu, platform.machine(), __import__("os").cpu_count() or 1,
                         tuple(features) or ("keine erkannten SIMD-Erweiterungen",),
                         tuple(gpus) or ("keine GPU erkannt",))

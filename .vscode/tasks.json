@@ -146,6 +146,23 @@
         "--verify-only"
       ],
       "dependsOn": "Build"
+    },
+    {
+      "label": "Run Vulkan GPU",
+      "type": "process",
+      "command": "${workspaceFolder}/build/bin/ARMv8/lidar_compute_vulkan",
+      "args": [
+        "--points",
+        "125",
+        "--transforms",
+        "1,8,1024",
+        "--verify-only"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "Build"
     }
   ]
 }

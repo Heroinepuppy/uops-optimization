@@ -89,3 +89,23 @@ add_custom_target(lidar_compute_gpu ALL
     DEPENDS "${LIDAR_GPU_OUTPUT_DIR}/lidar_compute_gpu${CMAKE_EXECUTABLE_SUFFIX}")
 
 endif()
+
+# Build native Vulkan compute when the SDK and shader compiler are available.
+find_package(Vulkan QUIET)
+find_program(GLSLANG_VALIDATOR NAMES glslangValidator)
+if(Vulkan_FOUND AND GLSLANG_VALIDATOR)
+    set(vulkan_shader "${CMAKE_CURRENT_BINARY_DIR}/lidar_vulkan_shader.h")
+    add_custom_command(OUTPUT "${vulkan_shader}"
+        COMMAND "${GLSLANG_VALIDATOR}" -V --target-env vulkan1.1 --vn lidar_shader
+            "${CMAKE_SOURCE_DIR}/benchmarks/lidar_compute_vulkan.comp" -o "${vulkan_shader}"
+        DEPENDS benchmarks/lidar_compute_vulkan.comp VERBATIM)
+    add_executable(lidar_compute_vulkan benchmarks/lidar_compute_vulkan.cpp "${vulkan_shader}")
+    target_include_directories(lidar_compute_vulkan PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+    target_link_libraries(lidar_compute_vulkan PRIVATE Vulkan::Vulkan)
+    if(NOT MSVC)
+        target_compile_options(lidar_compute_vulkan PRIVATE -O3 -Wall -Wextra -Wno-missing-field-initializers)
+    endif()
+    message(STATUS "Vulkan GPU benchmark enabled")
+else()
+    message(STATUS "Vulkan GPU benchmark disabled (requires Vulkan headers and glslangValidator)")
+endif()

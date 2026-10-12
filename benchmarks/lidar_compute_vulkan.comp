@@ -1,0 +1,25 @@
+#version 450
+layout(local_size_x = 64) in;
+layout(set=0,binding=0,std430) readonly buffer XInput { float x[]; };
+layout(set=0,binding=1,std430) readonly buffer YInput { float y[]; };
+layout(set=0,binding=2,std430) readonly buffer ZInput { float z[]; };
+layout(set=0,binding=3,std430) writeonly buffer XOutput { float ox[]; };
+layout(set=0,binding=4,std430) writeonly buffer YOutput { float oy[]; };
+layout(set=0,binding=5,std430) writeonly buffer ZOutput { float oz[]; };
+layout(push_constant,std430) uniform Parameters {
+    float r00,r01,r02,r10,r11,r12,r20,r21,r22,tx,ty,tz;
+    uint count, transforms;
+} p;
+// Each invocation owns one point; transform chains remain in registers.
+void main() {
+    uint i = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * gl_NumWorkGroups.x * 64;
+    if (i >= p.count) return;
+    float X=x[i], Y=y[i], Z=z[i];
+    for (uint step=0; step<p.transforms; ++step) {
+        float nx=fma(p.r02,Z,fma(p.r01,Y,p.r00*X))+p.tx;
+        float ny=fma(p.r12,Z,fma(p.r11,Y,p.r10*X))+p.ty;
+        float nz=fma(p.r22,Z,fma(p.r21,Y,p.r20*X))+p.tz;
+        X=nx; Y=ny; Z=nz;
+    }
+    ox[i]=X; oy[i]=Y; oz[i]=Z;
+}

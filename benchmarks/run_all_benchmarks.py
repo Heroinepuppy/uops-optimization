@@ -107,7 +107,8 @@ def resume_position(source, commands, profile=None):
         device = 'cpu' if cpu else 'gpu'
         mode = arg('--thread-mode') if cpu else ''
         methods = ({f'{m} / {mode}' for m in cpu_methods} if cpu else
-                   {'GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download'})
+                   set(profile.get('gpu_methods', ['GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download']) if profile else
+                       ['GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download']))
         max_rounds = int(arg('--rounds'))
         rounds = None
         seen = set()
@@ -239,7 +240,7 @@ def select_profile(info):
         info: HardwareInfo for the local host; ARM64 prefers the ARMv8 build.
     Returns:
         Dictionary with executable paths, method/mode lists and base CPU.
-        GPU is None when no built HIP executable is present.
+        GPU is None when no HIP build or usable hardware Vulkan build is present.
     """
     arm = info.architecture.lower() in ('aarch64', 'arm64')
     suffix = '.exe' if os.name == 'nt' else ''
@@ -247,7 +248,7 @@ def select_profile(info):
     cpu_candidates += [f'build/bin/lidar_compute_cpu{suffix}', CPU_EXE]
     cpu_exe = next((p for p in cpu_candidates if Path(p).is_file()), None)
     if cpu_exe is None:
-        raise FileNotFoundError('CPU benchmark missing. Run Build ARMv8 on the Pi or Build CPU first.')
+        raise FileNotFoundError('CPU benchmark missing. Run the Build task first.')
     query = subprocess.run([cpu_exe, '--capabilities'], check=True, capture_output=True,
                            text=True, timeout=10)
     capabilities = json.loads(query.stdout)
@@ -256,8 +257,23 @@ def select_profile(info):
         raise ValueError('CPU executable capabilities do not match the host architecture; rebuild it.')
     gpu_candidates = [f'build/bin/lidar_compute_gpu{suffix}', GPU_EXE]
     gpu_exe = None if arm else next((p for p in gpu_candidates if Path(p).is_file()), None)
-    return dict(cpu_exe=cpu_exe, gpu_exe=gpu_exe, methods=capabilities['methods'],
+    gpu_methods = None
+    vulkan = f'build/bin/ARMv8/lidar_compute_vulkan{suffix}' if arm else f'build/bin/lidar_compute_vulkan{suffix}'
+    if gpu_exe is None and Path(vulkan).is_file():
+        query = subprocess.run([vulkan, '--capabilities'], capture_output=True, text=True, timeout=10)
+        if query.returncode == 0:
+            gpu_methods = json.loads(query.stdout)['methods']
+            if not gpu_methods or not set(gpu_methods).issubset({
+                    'GPU kernel only', 'GPU resident (host sync)', 'Upload + GPU', 'Upload + GPU + Download'}):
+                raise ValueError('Invalid Vulkan GPU timing capabilities')
+            gpu_exe = vulkan
+        else:
+            print(f'Vulkan GPU unavailable: {query.stderr.strip()}', flush=True)
+    profile = dict(cpu_exe=cpu_exe, gpu_exe=gpu_exe, methods=capabilities['methods'],
                 thread_modes=capabilities['thread_modes'], cpu=capabilities['cpu'])
+    if gpu_methods is not None:
+        profile['gpu_methods'] = gpu_methods
+    return profile
 
 
 def main(argv=None):
@@ -281,7 +297,7 @@ def main(argv=None):
     parser.add_argument('--dry-run', action='store_true', help='Show commands without writes or execution')
     parser.add_argument('--pipeline-logs', action='store_true', help='Write per-step pipeline log files (disabled by default)')
     parser.add_argument('--restart', action='store_true', help='Discard existing results and start from the beginning')
-    parser.add_argument('--output-dir', type=Path, help='Output directory (ARM64: results/data/armv8; x86: results/data)')
+    parser.add_argument('--output-dir', type=Path, help='Output directory (ARM CPU: results/data/armv8; ARM Vulkan: results/data/armv8-vulkan; x86: results/data)')
     parser.add_argument('--max-seconds', type=int, default=300,
                         help='Estimated seconds per measurement block (default: 300); not a hard timeout')
     args = parser.parse_args(argv)
@@ -296,12 +312,13 @@ def main(argv=None):
             probe = subprocess.run([profile['gpu_exe'], '--points', '1', '--transforms', '1',
                                     '--verify-only'], capture_output=True, text=True, timeout=30)
             if probe.returncode:
-                print('HIP GPU unavailable; running CPU benchmarks only.', flush=True)
+                print('GPU unavailable; running CPU benchmarks only.', flush=True)
                 profile['gpu_exe'] = None
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
         raise SystemExit(f'Benchmark discovery failed: {exc}') from exc
     arm = info.architecture.lower() in ('aarch64', 'arm64')
-    directory = Path(os.path.relpath(args.output_dir or Path('results/data/armv8' if arm else 'results/data')))
+    default_directory = 'results/data/armv8-vulkan' if arm and profile['gpu_exe'] else ('results/data/armv8' if arm else 'results/data')
+    directory = Path(os.path.relpath(args.output_dir or Path(default_directory)))
     print(f"CPU executable: {profile['cpu_exe']}", flush=True)
     print(f"Methods: {', '.join(profile['methods'])}; thread modes: {', '.join(profile['thread_modes'])}", flush=True)
     print(f"GPU executable: {profile['gpu_exe'] or 'disabled'}; results: {directory}", flush=True)
