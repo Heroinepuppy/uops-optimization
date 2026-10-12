@@ -273,10 +273,15 @@ def crossover_fit_report(values, counts, all_rows, has_refinements=False):
     if len(points)<4:raise ValueError('Mindestens vier Umschlagintervalle erforderlich')
     results=[fit(points,False),fit(points,True)]
     best=min(results,key=lambda r:r['sse_us2'])
+    censored = [dict(points=int(r['points']),
+                     upper_transformations=int(r.get('last_tested_transformations', 0)))
+                for r in all_rows
+                if not r.get('first_gpu_faster') and r.get('last_tested_transformations')]
     report=dict(definition='x: midpoint of transform bracket; y: CPU latency linearly interpolated at midpoint',
                 objective='unweighted sum of squared residuals in microseconds; not logarithmic residuals',
                 caveat='midpoint estimates, not exact intersections; intervals are not confidence intervals',
-                models=results,best_by_sse=best,points=records,excluded_unbracketed_sizes=excluded,
+                models=results,best_by_sse=best,points=records,censored_no_gpu_win=censored,
+                excluded_unbracketed_sizes=excluded,
                 intervals_rebuilt_from_current_measurements=stale)
     return report
 
@@ -286,8 +291,15 @@ def fit_reports(records):
     points = [(row['points'] / 1e6, row['x']) for row in ordered]
     reports = {'crossover_hyperbola_fit': hyperbola_fit(points),
                'crossover_exponential_spline_fit': exponential_spline_fit(ordered)}
+    reports['crossover_sigmoid_spline_fit'] = sigmoid_spline_fit(ordered)
+    reports['crossover_inverse_comparison_fit'] = inverse_comparison_fit(
+        ordered, reports['crossover_exponential_spline_fit'])
     if len(records) >= 6:
         reports['crossover_hyperbola_transition_fit'] = transition_fit(points)
+        sigmoid = transition_fit(points)
+        sigmoid['model'] = 'K(N) = c + d / (1 + exp(-ln(N/N0) / w))'
+        sigmoid['method'] = 'sigmoid-only profile fit; no 1/N term'
+        reports['crossover_sigmoid_fit'] = sigmoid
     reports['crossover_hyperbola_models'] = dict(
         formula='K(N)=c+a/N+sum(d_j/(1+exp(-ln(N/N_j)/w_j)))',
         N_unit='million points', K_unit='transformations per point', points=points,
@@ -343,8 +355,82 @@ def exponential_spline_fit(records):
                 N_unit='million points', K_unit='transformations per point',
                 objective='Least squares in log K; b >= 0; fixed L1/L2/L3 regions',
                 caveat='Fewer than 3 points: provisional constant or two-point curve. '
-                       'Bridges match value and slope in log N/log K; brackets are not confidence intervals.',
+                       'Bridges in log N/log K use monotonicity-limited slopes; slope continuity may be lost. '
+                       'Brackets are not confidence intervals.',
                 cache_boundaries=boundaries, unsupported_regions=unsupported, segments=segments)
+
+
+def sigmoid_spline_fit(records):
+    """Fit one logistic curve in each populated cache section and bridge them."""
+    records = sorted(records, key=lambda row: row['points'])
+    boundaries = [4 * capacity / 24 / 1e6 for capacity in (32*1024, 512*1024, 16*1024*1024)]
+    edges = [0, *boundaries, float('inf')]
+    segments = []
+    for index, name in enumerate(('L1', 'L2', 'L3', 'RAM')):
+        rows = [r for r in records if edges[index] < r['points']/1e6 <= edges[index+1]]
+        if not rows:
+            continue
+        xs = [r['points']/1e6 for r in rows]
+        ys = [r['x'] for r in rows]
+        best = (float('inf'), 0, 0, 0)
+        lo, hi = math.log(max(xs[0], 1e-9)), math.log(max(xs[-1], 1e-8))
+        for center in [lo + (hi-lo)*i/60 for i in range(61)]:
+            for width in [0.05 + 2.95*i/60 for i in range(61)]:
+                z = [1/(1+math.exp(max(-700, min(700, -(math.log(x)-center)/width)))) for x in xs]
+                zm, ym = sum(z)/len(z), sum(ys)/len(ys)
+                zz = sum((q-zm)**2 for q in z)
+                d = sum((q-zm)*(y-ym) for q,y in zip(z,ys))/zz if zz else 0
+                c = ym-d*zm
+                loss = sum((c+d*q-y)**2 for q,y in zip(z,ys))
+                if loss < best[0]: best = (loss, center, width, c, d)
+        loss, center, width, c, d = best
+        segments.append(dict(region=name, start=xs[0], end=xs[-1], center=math.exp(center),
+                             width=width, c=c, d=d, count=len(rows),
+                             rmse_transformations=math.sqrt(loss/len(rows)),
+                             status='fit' if len(rows)>=3 else 'insufficient_points'))
+    return dict(model='Cache sections: sigmoid fits with cubic Hermite bridges',
+                N_unit='million points', K_unit='transformations per point',
+                objective='Least squares in transformations; one sigmoid per populated cache section',
+                caveat='Splines connect fitted sections; transitions between measured sections are not observed.',
+                cache_boundaries=boundaries, segments=segments)
+
+
+def sigmoid_spline(model, n):
+    def value(s, x):
+        return s['c'] + s['d']/(1+math.exp(max(-700, min(700, -(math.log(x)-math.log(s['center']))/s['width']))))
+    segments = model['segments']
+    for i, segment in enumerate(segments):
+        if n <= segment['end'] or i == len(segments)-1:
+            return value(segment, n)
+        right = segments[i+1]
+        if n < right['start']:
+            t = math.log(n/segment['end'])/math.log(right['start']/segment['end'])
+            return (1-t)*value(segment, segment['end']) + t*value(right, right['start'])
+
+
+def inverse_comparison_fit(records, exponential_report):
+    regions = []
+    for segment in exponential_report['segments']:
+        rows = [r for r in records if segment['start'] <= r['points']/1e6 <= segment['end']]
+        xs = [r['points']/1e6 for r in rows]
+        actual = [r['x'] for r in rows]
+        a = math.exp(sum(math.log(x*y) for x,y in zip(xs,actual))/len(rows))
+        predictions = {'inverse': [a/x for x in xs],
+                       'exponential': [math.exp(segment['log_a']-segment['b']*(x-segment['start'])) for x in xs]}
+        metrics = {}
+        for name, predicted in predictions.items():
+            metrics[name] = dict(
+                rmse_log=math.sqrt(sum(math.log(y/z)**2 for y,z in zip(predicted,actual))/len(rows)),
+                rmse_transformations=math.sqrt(sum((y-z)**2 for y,z in zip(predicted,actual))/len(rows)),
+                within_intervals=sum(r['lower'] <= y <= r['upper'] for r,y in zip(rows,predicted)))
+        regions.append(dict(**segment, inverse_a=a, metrics=metrics,
+                            best_by_log_rmse=min(metrics, key=lambda name: metrics[name]['rmse_log'])))
+    return dict(model='a/N versus a * exp(-b * (N-N0)) by cache region',
+                regions=regions, unsupported_regions=exponential_report['unsupported_regions'],
+                N_unit='million points', K_unit='transformations per point',
+                objective='Both fitted by least squares in log K on identical interval midpoints',
+                caveat='In-sample comparison, not predictive validation; inverse has 1 parameter, exponential 2. '
+                       'No fitted offset; fewer than 3 points are insufficient for comparison.')
 
 
 def exponential_spline(model, n):
@@ -361,10 +447,20 @@ def exponential_spline(model, n):
             left_n, right_n = segment['end'], right['start']
             width = math.log(right_n / left_n)
             t = math.log(n / left_n) / width
+            delta = (value(right, right_n) - value(segment, left_n)) / width
+            slopes = [-segment['b']*left_n, -right['b']*right_n]
+            # Limit Hermite tangents to prevent excursions beyond endpoint values.
+            if delta == 0:
+                slopes = [0., 0.]
+            else:
+                ratios = [max(0., slope/delta) for slope in slopes]
+                norm = math.hypot(*ratios)
+                scale = min(1., 3/norm) if norm else 1.
+                slopes = [ratio*scale*delta for ratio in ratios]
             y = ((2*t**3-3*t*t+1)*value(segment,left_n)
-                 +(t**3-2*t*t+t)*width*(-segment['b']*left_n)
+                 +(t**3-2*t*t+t)*width*slopes[0]
                  +(-2*t**3+3*t*t)*value(right,right_n)
-                 +(t**3-t*t)*width*(-right['b']*right_n))
+                 +(t**3-t*t)*width*slopes[1])
             return math.exp(max(-700, min(700, y)))
 
 

@@ -68,6 +68,21 @@ class AnalysisTests(unittest.TestCase):
         self.assertLess(result['rmse_us'], 1e-6)
 
     def test_exponential_spline_joins(self):
+        inverse_rows = [dict(points=n, x=2/(n/1e6), lower=1, upper=1000)
+                        for n in (8192, 16384, 32768, 65536)]
+        inverse_report = calculations.inverse_comparison_fit(
+            inverse_rows, calculations.exponential_spline_fit(inverse_rows))
+        region = inverse_report['regions'][0]
+        self.assertEqual(region['best_by_log_rmse'], 'inverse')
+        self.assertAlmostEqual(region['inverse_a'], 2)
+        self.assertAlmostEqual(region['metrics']['inverse']['rmse_log'], 0)
+        rising_bridge = {'segments': [
+            dict(start=1., end=2., log_a=math.log(40), b=.5),
+            dict(start=4., end=8., log_a=math.log(30), b=0.)]}
+        endpoint = calculations.exponential_spline(rising_bridge, 2.)
+        values = [calculations.exponential_spline(rising_bridge, 2+i/100) for i in range(201)]
+        self.assertTrue(all(endpoint-1e-10 <= y <= 30+1e-10 for y in values))
+        self.assertTrue(all(a <= b+1e-10 for a,b in zip(values,values[1:])))
         records = [dict(points=n, x=100*math.exp(-n/1e6),
                         lower=1, upper=200) for n in (8192, 16384, 32768, 131072, 262144, 524288)]
         model = calculations.exponential_spline_fit(records)
@@ -124,7 +139,7 @@ class AnalysisTests(unittest.TestCase):
             self.assertTrue(list((output / 'hist' / 'matrix').glob('histograms_points_*.png')))
             self.assertTrue((output / 'crossover' / 'compute_comparison.png').is_file())
             self.assertTrue((output / 'crossover' / 'crossover_exponential_fit.png').is_file())
-            self.assertEqual(len(images), 35)
+            self.assertEqual(len(images), 36)
             self.assertEqual({p.name for p in (output / 'comparision').glob('*.png')},
                              {f'cpu_gpu_comparison_transforms_{n}.png' for n in (1, 2, 4, 8, 16, 32)})
             for image in images:

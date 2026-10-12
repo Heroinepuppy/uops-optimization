@@ -2,7 +2,7 @@
 
 import math
 
-from calculations import CPU, GPU, exponential, exponential_spline, grid, histogram, histogram_peak, stepped
+from calculations import CPU, GPU, exponential, exponential_spline, grid, histogram, histogram_peak, sigmoid_spline, stepped
 
 METHODS = {CPU: '#D55E00', 'GPU kernel only': '#56B4E9',
            'GPU resident (host sync)': '#009E73', 'Upload + GPU': '#8C564B',
@@ -255,25 +255,31 @@ def runtime_by_points_plot(samples):
                                  marker='x', color=color, zorder=4)
             axis.set_xscale('log', base=2)
             axis.set_yscale('log')
-            ccx_count = {'single': 1, 'smt': 1, 'same-ccx': 1,
-                         'different-ccx': 2, 'four-ccx': 4}.get(mode)
-            if ccx_count is not None:
-                # Documented Ryzen 9 3950X: 16 MiB L3 per CCX.
-                # Balanced partitions, input + output: 6 floats per point.
-                capacity_mib = 16 * ccx_count
-                cache_points = capacity_mib * 2**20 / 24
-                axis.axvline(cache_points, color='black', linestyle=':', linewidth=1.3,
-                             label=f'L3: {ccx_count} x 16 MiB / 24 B pro Punkt')
-                axis.annotate(f'L3-Grenze: {cache_points:,.0f} Punkte',
+            topology = {'single': (1, 1), 'smt': (2, 1), 'same-ccx': (2, 1),
+                        'different-ccx': (2, 2), 'four-ccx': (4, 4)}.get(mode)
+            if topology is not None:
+                core_count, ccx_count = topology
+                # Documented Ryzen 9 3950X; balanced partitions, input + output.
+                cache_colors = {'L1': '#CC6677', 'L2': '#DDCC77', 'L3': '#117733'}
+                for cache_name, capacity in (('L1', 32*1024),
+                                             ('L2', 512*1024),
+                                             ('L3', 16*1024*1024)):
+                    available_cache = capacity * (core_count if cache_name != 'L3' else ccx_count)
+                    cache_points = available_cache / 24
+                    axis.axvline(cache_points, color=cache_colors[cache_name],
+                                 linestyle=':', linewidth=1.3,
+                                 label=f'{cache_name}: {cache_points:,.0f} Punkte')
+                    axis.annotate(f'{cache_name}: {cache_points:,.0f}',
                               xy=(cache_points, .98), xycoords=('data', 'axes fraction'),
                               xytext=(4, 0), textcoords='offset points', rotation=90,
-                              va='top', fontsize=7)
+                              va='top', fontsize=7, color=cache_colors[cache_name])
             axis.set(title=f'{count} Transformationen', xlabel='Punkte pro Cloud',
                      ylabel='Laufzeit pro Cloud [us]')
             axis.grid(alpha=.2)
             axis.legend(loc='best', fontsize=7, ncol=2)
         figure.supxlabel('Gesamte Transformationskette; x: Einzelmessung; '
-                         'L3: theoretische Kapazitaetsgrenze (Ryzen 9 3950X, Ein- + Ausgabe)', fontsize=9)
+                         'L1/L2 pro Kern, L3 pro CCX; theoretische Kapazitaetsgrenzen '
+                         '(Ryzen 9 3950X, Ein- + Ausgabe)', fontsize=9)
         yield f'runtime_by_points_{mode}', figure
 
 
@@ -293,11 +299,13 @@ def boundary_axis(axis, records):
     axis.set_ylim(.9 * min(r['lower'] for r in records),
                   1.1 * max(r['upper'] for r in records))
     # Historical hardware reference: four workers, XYZ input/output = 24 B/point.
-    for name, capacity in [('L1', 4*32*1024), ('L2', 4*512*1024), ('L3', 4*16*1024*1024)]:
+    cache_lines = [('L1', 4*32*1024), ('L2', 4*512*1024), ('L3', 4*16*1024*1024)]
+    locations = [capacity / 24 / 1e6 for _, capacity in cache_lines]
+    axis.set_xlim(left=min(min(x), min(locations)))
+    for name, capacity in cache_lines:
         location = capacity / 24 / 1e6
-        if min(x) <= location <= max(x):
-            axis.axvline(location, linestyle=':', color='red', alpha=.5)
-            axis.text(location, .02, name, transform=axis.get_xaxis_transform(), rotation=90)
+        axis.axvline(location, linestyle=':', color='red', alpha=.5)
+        axis.text(location, .02, name, transform=axis.get_xaxis_transform(), rotation=90)
 
 
 def describe(model):
@@ -349,6 +357,49 @@ def crossover_plot(report, reports):
     yield 'crossover_exponential_fit', figure
     for key, model in reports.items():
         if key == 'crossover_hyperbola_models':
+            continue
+        if 'regions' in model:
+            figure, axes = panels(len(model['regions']), 'Cache-Bereiche: 1/N gegen Exponentialfunktion')
+            for axis, region in zip(axes, model['regions']):
+                selected = [r for r in records if region['start'] <= r['points']/1e6 <= region['end']]
+                boundary_axis(axis, selected)
+                curve = grid(region['start'], region['end'], True)
+                axis.plot(curve, [region['inverse_a']/x for x in curve], label='a/N', color='#0072B2')
+                axis.plot(curve, [math.exp(region['log_a']-region['b']*(x-region['start'])) for x in curve],
+                          label='a exp(-b (N-N0))', color='#D55E00')
+                detail = '\n'.join(f"{name}: RMSE(log)={m['rmse_log']:.3g}; RMSE(K)={m['rmse_transformations']:.3g}; "
+                                   f"im Intervall {m['within_intervals']}/{region['count']}"
+                                   for name,m in region['metrics'].items())
+                axis.set_title(region['region'] + ': ' +
+                               (region['best_by_log_rmse'] + ' passt besser (log-RMSE)'
+                                if region['count'] >= 3 else 'zu wenige Messpunkte'), fontsize=9)
+                axis.text(.98, .97, detail, transform=axis.transAxes, ha='right', va='top', fontsize=7)
+                axis.legend(fontsize=8)
+            figure.supxlabel('Gleiche Intervallmitten und logarithmische Fehlerfunktion; '
+                             '1/N: 1 Parameter, Exponentialfunktion: 2. Keine Vorhersagevalidierung.\n'
+                             + evidence, fontsize=8)
+            yield key.removesuffix('_fit'), figure
+            continue
+        if 'segments' in model and 'sigmoid' in model.get('model', '').lower():
+            figure, axis = pyplot().subplots(figsize=(12, 8), layout='constrained')
+            boundary_axis(axis, records)
+            curve = grid(records[0]['points']/1e6, records[-1]['points']/1e6, True)
+            axis.plot(curve, [sigmoid_spline(model, x) for x in curve], color='#0072B2', label='Sigmoid-Spline')
+            censored = report.get('censored_no_gpu_win', [])
+            if censored:
+                axis.scatter([r['points']/1e6 for r in censored],
+                             [r['upper_transformations'] for r in censored],
+                             marker='v', color='#777777',
+                             label='Bis hier kein GPU-Gewinn (zensiert)')
+            for segment in model['segments']:
+                section = [r for r in records if segment['start'] <= r['points']/1e6 <= segment['end']]
+                xs = grid(segment['start'], segment['end'], True)
+                axis.plot(xs, [segment['c'] + segment['d']/(1+math.exp(max(-700,min(700,-(math.log(x)-math.log(segment['center']))/segment['width'])))) for x in xs],
+                          color='#D55E00', label=f"Sigmoid {segment['region']}")
+            axis.set_title(model['model'])
+            axis.legend()
+            figure.supxlabel(evidence + '\nOrange: einzelner Sigmoid je Cache-Bereich; blau: Verbindung durch die Bereiche.', fontsize=8)
+            yield key.removesuffix('_fit'), figure
             continue
         selected = [r for r in records if r['points'] >= model.get('minimum_points', 0)]
         figure, axis = pyplot().subplots(figsize=(12, 8), layout='constrained')

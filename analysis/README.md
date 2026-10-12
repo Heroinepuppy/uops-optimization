@@ -42,12 +42,31 @@ auf vier CCX (32 KiB L1-Daten, 512 KiB L2 pro Kern, 16 MiB L3 pro CCX;
 24 Byte Ein-/Ausgabe pro Punkt). Je belegtem Bereich wird
 `a * exp(-b * (N-N0))` mit `b >= 0` durch kleinste Quadrate in `log(K)` angepasst.
 Zwischen dem letzten Messpunkt eines Bereichs und dem ersten des naechsten
-verbindet ein blauer kubischer Hermite-Spline die Werte und Steigungen in
-`log(N)`/`log(K)`. Das ist eine glatte Verbindung, kein zusaetzlicher Messnachweis.
+verbindet ein blauer kubischer Hermite-Spline die Werte in `log(N)`/`log(K)`.
+Seine Steigungen werden gegen Ueberschwingen begrenzt; dabei kann die
+Steigung am Anschluss von der Exponentialfunktion abweichen. Der Plot verwendet
+logarithmische X- und Y-Achsen. Die Verbindung ist kein zusaetzlicher Messnachweis.
 RMSE und Lage innerhalb/ausserhalb der Messintervalle stehen im Plot/JSON.
 Bereiche mit weniger als drei Punkten sind als unzureichend belegt markiert
 (ein Punkt: konstante Hilfskurve; zwei Punkte: vorlaeufige Anpassung).
 Leere Bereiche erhalten keinen eigenen Fit. Die Hyperbel-Plots werden nicht ersetzt.
+Alle Crossover-Fitplots zeichnen die theoretischen L1-, L2- und L3-Grenzen
+ein. Die X-Achse wird bei Bedarf bis zur L1-Grenze erweitert, auch wenn dort
+noch kein Messpunkt liegt.
+Im Sigmoid-Plot erscheinen zusätzlich Punktgrößen ohne beobachteten GPU-Gewinn
+als graue Dreiecke bei der letzten getesteten Transformationszahl. Sie sind
+zensierte obere Grenzen und keine weiteren Übergangsmessungen.
+Zusätzlich erzeugt `fits` einen reinen Sigmoid-Fit
+`crossover_sigmoid_fit.png` und die zugehörige JSON-Datei. Er verwendet die
+logistische Übergangsfunktion ohne den zusätzlichen `a/N`-Term.
+`crossover_inverse_comparison.png` und `crossover_inverse_comparison_fit.json`
+vergleichen zusaetzlich `a/N` ohne Offset mit der Exponentialfunktion in
+denselben Cache-Bereichen. Beide minimieren quadratische Fehler in `log(K)`.
+Der Plot nennt logarithmischen RMSE, RMSE in Transformationen und die Anzahl
+der Vorhersagen innerhalb der Messintervalle. Der kleinere logarithmische
+RMSE bestimmt die angezeigte bessere Anpassung. Das ist ein Vergleich an den
+Fitdaten, keine Vorhersagevalidierung; `a/N` hat einen Parameter, die
+Exponentialfunktion zwei. Alle Dateien liegen unter `results/pics/crossover/`.
 Die Fits der Transformationsgrenze ueber der Punktzahl werden bis zu einem
 Punkt extrapoliert. Gestrichelte Kurven und grauer Hintergrund kennzeichnen
 den Bereich unterhalb der kleinsten fuer den jeweiligen Fit verwendeten
@@ -83,8 +102,11 @@ Die lokale Python-Umgebung muss bereits eingerichtet sein; alternativ kann
   Jeder Subplot zeigt sieben CPU-Methoden und vier GPU-Tests ueber alle
   Punktgroessen. Beide Achsen sind logarithmisch; die X-Achse verwendet Basis 2.
   Jeder Teilplot hat eine eigene Legende. Eine gepunktete Linie markiert die
-  theoretische L3-Kapazitaetsgrenze des dokumentierten Ryzen 9 3950X:
-  16 MiB je CCX, geteilt durch 24 Byte pro Punkt fuer Eingabe und Ausgabe.
+  theoretische L1-, L2- und L3-Kapazitaetsgrenzen des dokumentierten Ryzen 9 3950X:
+  32 KiB L1-Daten und 512 KiB L2 je physischem Kern sowie 16 MiB L3 je CCX,
+  jeweils geteilt durch 24 Byte pro Punkt fuer Eingabe und Ausgabe. SMT teilt
+  sich L1/L2; `same-ccx` nutzt zwei Kern-Caches und einen L3-Bereich,
+  `different-ccx` zwei L3-Bereiche, `four-ccx` vier.
   `single`, `smt` und `same-ccx` nutzen hier einen CCX, `different-ccx` zwei,
   `four-ccx` vier. Die Grenzen liegen damit bei ca. 699.051, 1.398.101 bzw.
   2.796.203 Punkten. Das setzt gleichmaessig verteilte Teilbereiche voraus;
